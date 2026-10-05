@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Game Night</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#0f1020;--card:#191b34;--tx:#f2f1ff;--mu:#9a9cc4;--ac:#ff5c8a;--ac2:#7c5cff;--ok:#3ddc97;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f3ff;--card:#fff;--tx:#1a1a33;--mu:#6a6c90}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Inter,system-ui,sans-serif;min-height:100vh}
+main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:2rem;margin:.2em 0;background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:.2em 0 .6em}.mu{color:var(--mu)}
+.card{background:var(--card);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 4px 18px #0003}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.game{border:1px solid #ffffff14;border-radius:14px;padding:14px;background:var(--card)}
+.game b{display:block;margin-bottom:4px}.tag{font-size:.72rem;padding:2px 8px;border-radius:99px;background:#ffffff14;color:var(--mu)}
+.tag.live{background:var(--ok);color:#06281a}
+button,input,select{font:inherit;border-radius:12px;border:1px solid #ffffff22;padding:10px 14px;background:var(--card);color:var(--tx)}
+button{cursor:pointer;background:linear-gradient(90deg,var(--ac),var(--ac2));border:0;color:#fff;font-weight:600;margin:3px}
+button.alt{background:var(--card);border:1px solid #ffffff22;color:var(--tx)}
+button:disabled{opacity:.4}
+.chips span{display:inline-block;margin:3px;padding:6px 12px;border-radius:99px;background:#ffffff14}
+.chips span.done{background:var(--ok);color:#06281a}
+.prompt{font-size:1.3rem;padding:18px;border-radius:14px;background:linear-gradient(135deg,#ff5c8a33,#7c5cff33);margin:10px 0}
+.code{font-size:1.6rem;letter-spacing:.3em;font-weight:800}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;border-bottom:1px solid #ffffff14}
+.big{font-size:1.1rem}
+</style></head><body><main id="app"></main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig={
+  apiKey:"AIzaSyAwguuhyo7R0HAivjHLJJDgcfDpxij2nN4",
+  authDomain:"gamenight-38743.firebaseapp.com",
+  projectId:"gamenight-38743",
+  storageBucket:"gamenight-38743.firebasestorage.app",
+  messagingSenderId:"946267022841",
+  appId:"1:946267022841:web:3efae261c06fe3de350928"
+};
+const fdb=getFirestore(initializeApp(firebaseConfig));
+const wrap=n=>s=>n({exists:s.exists(),data:()=>s.data()});
+const fb={
+  doc:p=>{const r=doc(fdb,p);return{set:d=>setDoc(r,d),update:d=>updateDoc(r,d),onSnapshot:(n,e)=>onSnapshot(r,wrap(n),e)}},
+  collection:p=>{const c=collection(fdb,p);return{doc:id=>fb.doc(p+"/"+id),onSnapshot:(n,e)=>onSnapshot(c,n,e)}}
+};
+const CAT=[["Pizza","Italian food"],["Elephant","Big animal"],["Cricket","A sport"],["Hyderabad","A city"],["Biryani","A dish"],["Netflix","Streaming"],["Guitar","Instrument"],["Beach","A place"],["Rain","Weather"],["Doctor","A profession"],["Bicycle","Transport"],["Mango","A fruit"]];
+const MLT=[["Who is most likely to cry at a movie?","Who is most likely to miss a flight?"],["Who is most likely to become a millionaire?","Who is most likely to get lost in their own city?"],["Who is most likely to sleep through an exam?","Who is most likely to adopt 10 cats?"],["Who is most likely to become famous?","Who is most likely to forget a birthday?"]];
+const RQ=[["Most days you have gone without bathing?","How many hours do you sleep on average?"],["At what age do you expect to buy a house?","At what age do you expect to get married?"],["How much money did you spend on food last week?","How many hours of screen time do you get a day?"],["How many friends would you trust with a secret?","How many movies did you watch this month?"]];
+const GAMES={cat:"Categories",mlt:"Who is most likely to",rq:"Random questions",own:"Host's question"};
+const $=s=>document.querySelector(s),pick=a=>a[Math.floor(Math.random()*a.length)];
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let db=null,me,name="",code="",room=null,P=[],unsub=[],err="",setupOpen=false;const draft={m:"",a:"",R:1};
+try{me=sessionStorage.gn_id}catch(e){}
+if(!me){me="p"+Math.random().toString(36).slice(2,9);try{sessionStorage.gn_id=me}catch(e){}}
+db=fb;
+const rdoc=()=>db.doc("rooms/"+code),pcol=()=>db.collection("rooms/"+code+"/players"),pdoc=()=>pcol().doc(me);
+const isHost=()=>room&&room.host===me;
+const A=()=>room&&room.game==="own"?P.filter(p=>p.id!==room.host):P; // players who answer/vote (quizmaster sits out)
+const L=()=>room&&room.phase==="lobby"?P:A();
+const nm=id=>(P.find(p=>p.id===id)||{}).name||"?";
+const T=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({message:"Timed out. Create the Firestore database (test mode) in the Firebase console, then reload."}),7000))]);
+window.addEventListener("unhandledrejection",e=>{err=String((e.reason&&e.reason.message)||e.reason);render()});
+async function enter(c,create){
+  name=$("#nm").value.trim();if(!name){err="Type your name first";render();return}c=c.toUpperCase().trim();if(!c){err="Enter a room code";render();return}
+  
+  code=c;err="Connecting…";render();unsub.forEach(u=>u());
+  try{
+    if(create)await T(rdoc().set({host:me,phase:"lobby"}));
+    await T(pdoc().set({name,t:Date.now()}));err="";
+    unsub=[rdoc().onSnapshot(s=>{room=s.exists?s.data():null;host();render()}),
+      pcol().onSnapshot(q=>{P=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);host();render()})];
+  }catch(e){err="Could not connect: "+(e.message||e.code)}
+  render();
+}
+const sub=(p,k)=>p[k]!==undefined;
+function host(){ // host auto-advances when everyone has acted
+  if(!isHost()||!P.length)return;
+  const g=room.gid;
+  if(room.phase==="answer"&&A().length&&A().every(p=>sub(p,g+"_"+room.r)))rdoc().update({phase:"reveal"});
+  if(room.phase==="vote"&&A().length&&A().every(p=>sub(p,"v"+g)))rdoc().update({phase:"result"});
+}
+function start(game){
+  const imp=pick(P).id;let main,alt;
+  if(game==="cat"){const [w,h]=pick(CAT);main="The word is: "+w;alt="Your hint: "+h}
+  else{[main,alt]=pick(game==="mlt"?MLT:RQ)}
+  rdoc().set({host:me,phase:"answer",game,gid:Date.now(),r:1,R:game==="cat"?3:1,imp,main,alt});
+}
+const say=(k,v)=>pdoc().update({[k]:v});
+function next(){room.r<room.R?rdoc().update({phase:"answer",r:room.r+1}):rdoc().update({phase:"vote"})}
+function chips(f){return '<div class="chips">'+L().map(p=>`<span class="${f&&f(p)?"done":""}">${esc(p.name)}${p.id===room.host?" 👑":""}</span>`).join("")+"</div>"}
+function hub(){return `<h2>Game library</h2><div class="grid">
+<div class="game"><b>🕵️ Guess the Imposter</b><span class="tag live">playable · 4 modes</span><p class="mu">Categories, Who is most likely to, Random questions, or your own question.</p></div>
+<div class="game"><b>🎭 Mafia / Among Us</b><span class="tag">coming soon</span><p class="mu">Roles dealt secretly, day/night phases.</p></div>
+<div class="game"><b>🔥 1 to 100</b><span class="tag">coming soon</span><p class="mu">Hot or cold guessing with a 1–100 closeness score.</p></div>
+<div class="game"><b>🎨 Skribbl / 🌍 OpenGuessr</b><span class="tag">play on their sites</span><p class="mu">Make a private room there and share the link in your group.</p></div></div>`}
+function render(){
+  const a=$("#app");
+  if(db===null){a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Connecting… (open this page from the shared Claude link and sign in)</p>`;return}
+  if(!room||!code){
+    a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Play with your friends, from anywhere.</p>
+    <div class="card"><input id="nm" autocomplete="off" placeholder="Your name" value="${esc(name)}" maxlength="14">
+    <div style="margin-top:10px"><input id="cd" placeholder="Room code" value="${esc(code)}" maxlength="6" style="text-transform:uppercase;width:130px">
+    <button onclick="enter($('#cd').value,false)">Join</button>
+    <button class="alt" onclick="enter(Math.random().toString(36).slice(2,6).toUpperCase(),true)">Create room</button></div>
+    ${code&&!room?'<p class="mu">Waiting for room '+esc(code)+"…</p>":""}<p style="color:var(--ac)">${esc(err)}</p></div>`+hub();return}
+  const g=room.gid,ph=room.phase;
+  let h=`<h1>🎲 Game Night</h1><div class="mu">Room <span class="code">${esc(code)}</span> · you are ${esc(name)}</div>`;
+  if(ph==="lobby"){
+    h+=`<div class="card"><h2>Players (${P.length})</h2>${chips()}<p class="mu">Share the room code. 5–7 players is ideal.</p></div>`;
+    h+=isHost()&&setupOpen?setupCard():isHost()?`<div class="card"><h2>Pick a game</h2>${Object.keys(GAMES).map(k=>`<button ${P.length<(k==="own"?4:3)?"disabled":""} onclick="${k==="own"?"openSetup()":"start('"+k+"')"}">${GAMES[k]}</button>`).join("")}<p class="mu">Need at least 3 players. Host's question needs you + 3 players.</p></div>`:`<p class="mu">Waiting for the host to pick a game…</p>`;
+    h+=hub();
+  }else if(ph==="answer"){
+    const mine=me===room.imp?room.alt:room.main,k=g+"_"+room.r,mp=P.find(p=>p.id===me)||{},done=sub(mp,k),qm=room.game==="own"&&isHost();
+    h+=`<div class="card"><h2>${GAMES[room.game]}${room.R>1?` · round ${room.r}/${room.R}`:""}</h2><div class="prompt">${esc(qm?room.main:mine)}</div>${qm?`<div class="mu">Imposter is <b>${esc(nm(room.imp))}</b> and sees:</div><div class="prompt">${esc(room.alt)}</div>`:""}`;
+    if(qm)h+=`<p class="mu">You're the quizmaster. Waiting for answers…</p><button class="alt" onclick="rdoc().update({phase:'reveal'})">Reveal now</button>`;else if(done)h+=`<p class="mu">Answer locked in. Waiting for others…</p>`;
+    else if(room.game==="mlt")h+=`<p>Pick a person:</p>`+P.map(p=>`<button class="alt" onclick="say('${k}',${esc(JSON.stringify(p.name)).replace(/'/g,"")})">${esc(p.name)}</button>`).join("");
+    else h+=`<input id="ans" placeholder="${room.game==="cat"?"One vague clue":"Your answer"}" maxlength="60" style="width:100%"><button onclick="say('${k}',$('#ans').value.trim()||'—')">Submit</button>`;
+    h+=chips(p=>sub(p,k))+"</div>";
+  }else if(ph==="reveal"||ph==="vote"||ph==="result"){
+    const upto=ph==="reveal"?room.r:room.R;
+    h+=`<div class="card"><h2>Answers</h2><table><tr><th></th>${Array.from({length:upto},(_,i)=>`<th>${room.R>1?"R"+(i+1):"Answer"}</th>`).join("")}</tr>`+A().map(p=>`<tr><td><b>${esc(p.name)}</b></td>${Array.from({length:upto},(_,i)=>`<td>${esc(p[g+"_"+(i+1)])}</td>`).join("")}</tr>`).join("")+"</table>";
+    if(ph==="reveal")h+=isHost()?`<button onclick="next()">${room.r<room.R?"Next round":"Go to voting"}</button>`:`<p class="mu">Host will continue…</p>`;
+    h+="</div>";
+    if(ph!=="reveal"&&room.game!=="cat"&&!(room.game==="own"&&ph==="vote"))h+=`<div class="card"><div class="mu">The real question was</div><div class="prompt">${esc(room.main)}</div></div>`;
+    if(ph==="vote"){
+      const mp=P.find(p=>p.id===me)||{};
+      h+=`<div class="card"><h2>Who is the imposter?</h2>`+(isHost()&&room.game==="own"?`<p class="mu">Players are voting…</p><button class="alt" onclick="rdoc().update({phase:'result'})">Show result now</button>`:sub(mp,"v"+g)?`<p class="mu">Vote cast. Waiting…</p>`:A().filter(p=>p.id!==me).map(p=>`<button class="alt" onclick="say('v${g}','${p.id}')">${esc(p.name)}</button>`).join(""))+chips(p=>sub(p,"v"+g))+"</div>";
+    }
+    if(ph==="result"){
+      const t={};A().forEach(p=>{const v=p["v"+g];t[v]=(t[v]||0)+1});
+      const top=Math.max(...A().map(p=>t[p.id]||0)),caught=(t[room.imp]||0)===top&&top>0;
+      h+=`<div class="card"><h2>${caught?"🎉 Imposter caught!":"😈 Imposter wins!"}</h2><p class="big">The imposter was <b>${esc(nm(room.imp))}</b>.</p><p class="mu">Their prompt: ${esc(room.alt)}</p>
+      <p>Votes: ${A().map(p=>esc(p.name)+" "+(t[p.id]||0)).join(" · ")}</p>${isHost()?`<button onclick="rdoc().update({phase:'lobby'})">Play again</button>`:""}</div>`;
+    }
+  }
+  const f=document.activeElement&&document.activeElement.id,v=f&&document.activeElement.value;
+  a.innerHTML=h;if(f&&$("#"+f)){$("#"+f).value=v;$("#"+f).focus()}
+}
+render();
+function openSetup(){setupOpen=true;err="";render()}
+function closeSetup(){setupOpen=false;err="";render()}
+function setupCard(){return `<div class="card"><h2>Your own question</h2>
+<p class="mu">Everyone sees this. You'll be the quizmaster and sit out the answering.</p>
+<input id="hm" placeholder="e.g. Name a famous Indian dish" value="${esc(draft.m)}" maxlength="120" style="width:100%" oninput="draft.m=this.value">
+<p class="mu">The imposter sees this hint or different question instead:</p>
+<input id="ha" placeholder="e.g. Name a famous Italian dish" value="${esc(draft.a)}" maxlength="120" style="width:100%" oninput="draft.a=this.value">
+<p class="mu">Rounds: <select onchange="draft.R=+this.value">${[1,2,3].map(n=>`<option ${draft.R===n?"selected":""}>${n}</option>`).join("")}</select></p>
+<button onclick="startOwn()">Start game</button><button class="alt" onclick="closeSetup()">Back</button>
+<p style="color:var(--ac)">${esc(err)}</p></div>`}
+function startOwn(){
+  const m=draft.m.trim(),a=draft.a.trim(),pl=P.filter(p=>p.id!==me);
+  if(!m||!a){err="Fill in both boxes";render();return}
+  if(pl.length<3){err="Need at least 3 players besides you";render();return}
+  setupOpen=false;err="";
+  rdoc().set({host:me,phase:"answer",game:"own",gid:Date.now(),r:1,R:draft.R,imp:pick(pl).id,main:m,alt:a});
+}
+Object.assign(window,{enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
+</script></body></html>
