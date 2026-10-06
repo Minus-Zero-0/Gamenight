@@ -2,8 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><title>Game Night</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
-:root{--bg:#0f1020;--card:#191b34;--tx:#f2f1ff;--mu:#9a9cc4;--ac:#ff5c8a;--ac2:#7c5cff;--ok:#3ddc97;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f3ff;--card:#fff;--tx:#1a1a33;--mu:#6a6c90}}
+:root{--bg:#0f1020;--card:#191b34;--tx:#f2f1ff;--mu:#9a9cc4;--ac:#ff5c8a;--ac2:#7c5cff;--ok:#3ddc97;--fld:#0b0c1a;--bd:#6a6ea8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f3ff;--card:#fff;--tx:#1a1a33;--mu:#6a6c90;--fld:#eceeff;--bd:#7a7fb8}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:Inter,system-ui,sans-serif;min-height:100vh}
 main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
@@ -14,9 +14,11 @@ h2{margin:.2em 0 .6em}.mu{color:var(--mu)}
 .game{border:1px solid #ffffff14;border-radius:14px;padding:14px;background:var(--card)}
 .game b{display:block;margin-bottom:4px}.tag{font-size:.72rem;padding:2px 8px;border-radius:99px;background:#ffffff14;color:var(--mu)}
 .tag.live{background:var(--ok);color:#06281a}
-button,input,select{font:inherit;border-radius:12px;border:1px solid #ffffff22;padding:10px 14px;background:var(--card);color:var(--tx)}
+button,input,select{font:inherit;border-radius:12px;border:1.5px solid var(--bd);padding:10px 14px;background:var(--fld);color:var(--tx)}
 button{cursor:pointer;background:linear-gradient(90deg,var(--ac),var(--ac2));border:0;color:#fff;font-weight:600;margin:3px}
-button.alt{background:var(--card);border:1px solid #ffffff22;color:var(--tx)}
+button.alt{background:var(--fld);border:1.5px solid var(--bd);color:var(--tx)}
+input:focus,select:focus{outline:2px solid var(--ac);outline-offset:1px}input::placeholder{color:var(--mu);opacity:1}
+.fw input,.fw select{display:block;width:100%;margin:6px 0}
 button:disabled{opacity:.4}
 .chips span{display:inline-block;margin:3px;padding:6px 12px;border-radius:99px;background:#ffffff14}
 .chips span.done{background:var(--ok);color:#06281a}
@@ -29,12 +31,27 @@ table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;bord
 .send{display:flex;gap:6px}.send input{flex:1;min-width:0}
 .ann{background:#7c5cff33;border-left:3px solid var(--ac);padding:6px 8px;border-radius:8px}
 .plea{padding:10px 12px;margin:6px 0;border-radius:12px;background:#ffffff0d}
+.av{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;object-fit:cover;color:#fff;font-weight:700;font-size:.8rem;vertical-align:middle;flex:none}
+.pfps{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;max-height:320px;overflow-y:auto;margin:8px 0}
+.pf{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;background:var(--fld);border:1.5px solid var(--bd);color:var(--tx);margin:0;font-weight:400;position:relative}
+.pf small{font-size:.68rem;text-align:center;line-height:1.1}.pf.sel{border-color:var(--ok);box-shadow:0 0 0 2px var(--ok)}
+.pf:disabled{opacity:.35}.pf em{position:absolute;top:2px;right:4px;font-size:.6rem;font-style:normal;color:var(--ac)}
+.me-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.stage{display:grid;gap:6px;margin:12px 0;padding:10px;border-radius:18px;background:var(--card)}
+.pc{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;text-align:center;min-width:0}
+.pc small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc.dd{opacity:.4;filter:grayscale(1)}
+.scr{display:flex;align-items:center;justify-content:center;min-height:150px;padding:14px;border-radius:16px;text-align:center;background:radial-gradient(circle at 50% 30%,#3a1f5c,#120a1f 70%);color:#fff;box-shadow:inset 0 0 40px #000a,0 0 24px #7c5cff55;font-size:1.05rem;line-height:1.35}
+.scr .fx{animation:fi .7s ease}@keyframes fi{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.lg{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:14px;background:#000a;border:1.5px solid var(--bd);color:#fff;font-size:1.6rem}.lg b{font-size:.8rem;letter-spacing:.25em}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1;margin:0;background:var(--fld);border:1.5px solid var(--bd);color:var(--tx)}
+.tabs button.on{background:linear-gradient(90deg,var(--ac),var(--ac2));border:0;color:#fff}.tabs i{background:var(--ac);color:#fff;border-radius:99px;padding:0 6px;margin-left:6px;font-style:normal;font-size:.75rem}
+@media(prefers-reduced-motion:reduce){.scr .fx{animation:none}}
 </style></head><body><main id="app"></main>
 <script type="module">
 const PASSWORD="gamenight"; // <-- change the password here
 let unlocked=false;
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,getDoc,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={
   apiKey:"AIzaSyAwguuhyo7R0HAivjHLJJDgcfDpxij2nN4",
   authDomain:"gamenight-38743.firebaseapp.com",
@@ -65,14 +82,57 @@ const A=()=>room&&(room.game==="own"||room.game==="maf"&&room.narr)?P.filter(p=>
 const L=()=>room&&room.phase==="lobby"?P:A();
 const nm=id=>(P.find(p=>p.id===id)||{}).name||"?";
 const T=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({message:"Timed out. Create the Firestore database (test mode) in the Firebase console, then reload."}),7000))]);
+
+let user=null,scr="load",sf={n:"",g:"m",pf:"",pw:""},perr="",PT={},shown="";
+const MA=["Naruto Uzumaki", "Sasuke Uchiha", "Kakashi Hatake", "Itachi Uchiha", "Madara Uchiha", "Jiraiya", "Monkey D. Luffy", "Roronoa Zoro", "Sanji", "Portgas D. Ace", "Trafalgar Law", "Shanks", "Son Goku", "Vegeta", "Gohan", "Trunks", "Light Yagami", "L", "Ryuk", "Eren Yeager", "Levi Ackerman", "Armin Arlert", "Erwin Smith", "Tanjiro Kamado", "Zenitsu Agatsuma", "Inosuke Hashibira", "Kyojuro Rengoku", "Giyu Tomioka", "Satoru Gojo", "Yuji Itadori", "Megumi Fushiguro", "Ryomen Sukuna", "Izuku Midoriya", "Katsuki Bakugo", "Shoto Todoroki", "All Might", "Ichigo Kurosaki", "Sosuke Aizen", "Edward Elric", "Roy Mustang", "Spike Spiegel", "Lelouch Lamperouge", "Killua Zoldyck", "Gon Freecss", "Hisoka", "Saitama", "Natsu Dragneel", "Gintoki Sakata", "Kirito", "Denji"],FE=["Mikasa Ackerman", "Hinata Hyuga", "Sakura Haruno", "Tsunade", "Ino Yamanaka", "Temari", "Nami", "Nico Robin", "Boa Hancock", "Bulma", "Chi-Chi", "Android 18", "Misa Amane", "Nezuko Kamado", "Shinobu Kocho", "Mitsuri Kanroji", "Kanao Tsuyuri", "Makima", "Power", "Nobara Kugisaki", "Maki Zenin", "Ochaco Uraraka", "Momo Yaoyorozu", "Tsuyu Asui", "Rukia Kuchiki", "Orihime Inoue", "Yoruichi Shihoin", "Winry Rockbell", "Riza Hawkeye", "Revy", "Zero Two", "Asuna Yuuki", "Rem", "Emilia", "Megumin", "Aqua", "Erza Scarlet", "Lucy Heartfilia", "Violet Evergarden", "Mai Sakurajima", "Kaguya Shinomiya", "Chika Fujiwara", "Marin Kitagawa", "Anya Forger", "Yor Forger", "Frieren", "Fern", "Hitagi Senjougahara", "Mitsuha Miyamizu", "Holo"];
+const IMG={}; // add pfp image links/files later, e.g. IMG.m0="images/naruto.png" (m = male #, f = female #)
+const PFN=id=>(id[0]==="m"?MA:FE)[+id.slice(1)]||"?";
+const av=(id,s=44)=>!id?`<span class="av" style="width:${s}px;height:${s}px;background:#555">?</span>`:IMG[id]?`<img class="av" style="width:${s}px;height:${s}px" src="${esc(IMG[id])}" alt="">`:`<span class="av" style="width:${s}px;height:${s}px;background:hsl(${(id.slice(1)*47+(id[0]==="f"?200:0))%360} 55% 40%)">${esc(PFN(id).split(" ").map(w=>w[0]).join("").slice(0,2))}</span>`;
+const key=n=>n.trim().toLowerCase().replace(/[^a-z0-9]/g,"_");
+const hsh=async p=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("gn:"+p)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+fb.collection("pfps").onSnapshot(q=>{PT={};q.docs.forEach(d=>PT[d.id]=d.data().o);if(scr==="prof")render()});
+function setUser(a,k,h){user={k,h,name:a.name,g:a.g,pf:a.pf};name=a.name;try{localStorage.gn_u=JSON.stringify({k,h})}catch(e){}scr="";perr="";render()}
+async function autoLogin(){let s=null;try{s=JSON.parse(localStorage.gn_u)}catch(e){}
+ if(s)try{const d=await T(getDoc(doc(fdb,"accounts",s.k)));if(d.exists()&&d.data().h===s.h)return setUser(d.data(),s.k,s.h)}catch(e){}
+ scr="login";render()}
+async function doLogin(){const k=key($("#ln").value);if(!k||!$("#lp").value){perr="Enter your name and password";return render()}
+ try{const d=await T(getDoc(doc(fdb,"accounts",k))),h=await hsh($("#lp").value);if(!d.exists()||d.data().h!==h){perr="Wrong name or password";return render()}setUser(d.data(),k,h)}catch(e){perr=e.message||String(e);render()}}
+const goScr=x=>{scr=x;perr="";render()};
+function checkSite(){if($("#sp").value===PASSWORD){sf={n:"",g:"m",pf:"",pw:""};goScr("prof")}else{perr="Wrong password";render()}}
+function openProf(){sf={n:user.name,g:user.g,pf:user.pf,pw:""};goScr("prof")}
+const cancelProf=()=>goScr(user?"":"login");
+function logout(){try{localStorage.removeItem("gn_u")}catch(e){}location.reload()}
+const sfset=(k,v)=>{sf[k]=v};
+function setG(g){sf.g=g;if(sf.pf&&sf.pf[0]!==g)sf.pf="";render()}
+function setPf(id){sf.pf=id;render()}
+async function saveProf(){const n=sf.n.trim(),pw=sf.pw,ed=!!user;
+ if(!n||!sf.pf||(pw?pw.length<4:!ed)){perr=!n?"Enter a name":!sf.pf?"Pick a profile pic":"Password needs 4+ characters";return render()}
+ const nk=key(n),ok=ed?user.k:null,h=pw?await hsh(pw):user.h;
+ try{await T(runTransaction(fdb,async tx=>{const ar=doc(fdb,"accounts",nk),pr=doc(fdb,"pfps",sf.pf),pa=await tx.get(pr),aa=await tx.get(ar);
+  if(aa.exists()&&nk!==ok)throw Error("That name is already taken");
+  if(pa.exists()&&pa.data().o!==ok)throw Error("That profile pic was just taken, pick another");
+  tx.set(ar,{name:n,g:sf.g,pf:sf.pf,h});tx.set(pr,{o:nk});
+  if(ed&&user.pf!==sf.pf)tx.delete(doc(fdb,"pfps",user.pf));if(ed&&nk!==ok)tx.delete(doc(fdb,"accounts",ok))}));
+  setUser({name:n,g:sf.g,pf:sf.pf},nk,h);if(code&&room)pdoc().update({name:n,pfp:sf.pf}).catch(()=>{})}
+ catch(e){perr=e.message||String(e);render()}}
+function authView(){const a=$("#app"),e=perr?`<p style="color:var(--ac)">${esc(perr)}</p>`:"",H="<h1>🎲 Game Night</h1>";
+ if(scr==="load")a.innerHTML=H+'<p class="mu">Loading…</p>';
+ else if(scr==="login")a.innerHTML=H+`<div class="card fw"><h2>Log in</h2><input id="ln" placeholder="Name" autocomplete="username" maxlength="14"><input id="lp" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"><button onclick="doLogin()">Log in</button>${e}<p class="mu">New here?</p><button class="alt" onclick="goScr('spw')">Sign in</button></div>`;
+ else if(scr==="spw")a.innerHTML=H+`<div class="card fw"><p class="mu">Enter the site password to create an account.</p><input id="sp" type="password" placeholder="Site password" onkeydown="if(event.key==='Enter')checkSite()"><button onclick="checkSite()">Continue</button><button class="alt" onclick="goScr('login')">Back</button>${e}</div>`;
+ else{const tk=user&&user.k;a.innerHTML=H+`<div class="card fw"><h2>${user?"Change profile":"Create your account"}</h2><input id="fn" placeholder="Name" maxlength="14" value="${esc(sf.n)}" oninput="sfset('n',this.value)"><select onchange="setG(this.value)"><option value="m" ${sf.g==="m"?"selected":""}>Male</option><option value="f" ${sf.g==="f"?"selected":""}>Female</option></select><input id="fpw" type="password" placeholder="${user?"New password (leave empty to keep)":"Set a password (4+ characters)"}" value="${esc(sf.pw)}" oninput="sfset('pw',this.value)"><p class="mu">Pick your profile pic</p><div class="pfps">${(sf.g==="m"?MA:FE).map((n,i)=>{const id=sf.g+i,t=PT[id]&&PT[id]!==tk;return `<button class="pf ${sf.pf===id?"sel":""}" ${t?"disabled":""} onclick="setPf('${id}')">${av(id,52)}<small>${esc(n)}</small>${t?"<em>Taken</em>":""}</button>`}).join("")}</div><button onclick="saveProf()">Save</button><button class="alt" onclick="cancelProf()">${user?"Cancel":"Back"}</button>${e}</div>`}}
+function stage(){const ps=A(),n=ps.length,w=n<9?3:4,t=Math.max(1,Math.floor((n-w)/2)),b=n-w-2*t,
+ c=(p,r,k)=>`<div class="pc ${dead(p.id)?"dd":""}" style="grid-area:${r}/${k}">${av(p.pfp,46)}<small>${esc(p.name)}</small></div>`,
+ lat=CH.filter(x=>x.gid===room.gid&&x.ann&&vis(x)).pop(),fx=lat&&lat.id!==shown?"fx":"";shown=lat?lat.id:"";
+ const cells=ps.slice(0,w).map((p,i)=>c(p,1,i+1)).join("")+ps.slice(w,w+t).map((p,j)=>c(p,j+2,1)).join("")+ps.slice(w+t,w+2*t).map((p,j)=>c(p,j+2,w)).join("")+ps.slice(w+2*t).map((p,k)=>c(p,t+2,k+1)).join("");
+ return `<div class="stage" style="grid-template-columns:${["1fr",...Array(w-2).fill(3/(w-2)+"fr"),"1fr"].join(" ")}">${cells}<div class="scr" style="grid-area:2/2/${t+2}/${w}"><div class="${fx}">${lat?esc(lat.text):"The game begins…"}</div></div><div class="lg" style="grid-area:${t+2}/${b+1}/${t+3}/${w+1}"><span>🎭</span><b>MAFIA</b></div></div>`}
 window.addEventListener("unhandledrejection",e=>{err=String((e.reason&&e.reason.message)||e.reason);render()});
 async function enter(c,create){
-  name=$("#nm").value.trim();if(!name){err="Type your name first";render();return}c=c.toUpperCase().trim();if(!c){err="Enter a room code";render();return}
+  name=user.name;c=c.toUpperCase().trim();if(!c){err="Enter a room code";render();return}
   
   code=c;CH=[];err="Connecting…";render();unsub.forEach(u=>u());
   try{
     if(create)await T(rdoc().set({host:me,phase:"lobby"}));
-    await T(pdoc().set({name,t:Date.now()}));err="";
+    await T(pdoc().set({name,t:Date.now(),pfp:user.pf}));err="";
     unsub=[rdoc().onSnapshot(s=>{room=s.exists?s.data():null;host();render()}),
       pcol().onSnapshot(q=>{P=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);host();render()}),
       db.collection("rooms/"+code+"/chat").onSnapshot(q=>{CH=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);render()})];
@@ -101,22 +161,28 @@ function canChat(){return room.game!=="maf"||narr()||dead(me)||room.phase!=="mni
 function sendChat(){const el=$("#ci"),t=el.value.trim();if(!t)return;el.value="";const ts=Date.now();let x={};
  if(room.game==="maf")x={to:narr()?"all":dead(me)?"dead":room.phase==="mnight"?"maf":"all",ann:narr()};
  db.doc("rooms/"+code+"/chat/"+ts+"_"+me).set({gid:room.gid,name,pid:me,text:t.slice(0,200),t:ts,...x})}
-function chatCard(){const m=CH.filter(c=>c.gid===room.gid&&vis(c));return `<div class="card"><h2>💬 Chat</h2><div class="chat" id="cl">${m.length?m.map(c=>c.ann?`<div class="ann">📣 ${esc(c.text)}</div>`:`<div><b class="${c.pid===me?"me":""}">${c.to==="maf"?"🔪 ":c.to==="dead"?"👻 ":""}${esc(c.name)}:</b> ${esc(c.text)}</div>`).join(""):'<span class="mu">Say something…</span>'}</div>${canChat()?`<div class="send"><input id="ci" placeholder="${narr()?"Announce to everyone":"Message"}" maxlength="200" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Send</button></div>`:'<p class="mu">🌙 Night: chat is closed.</p>'}</div>`}
+let ctab="c",sC=0,sA=0,sg=0;
+function setTab(t){ctab=t;render()}
+function chatCard(){const mf=room.game==="maf",m=CH.filter(c=>c.gid===room.gid&&vis(c)),cm=m.filter(c=>!c.ann),an=m.filter(c=>c.ann),sh=mf?(ctab==="a"?an:cm):m;
+ if(sg!==room.gid){sg=room.gid;sC=sA=0}if(ctab==="c")sC=cm.length;else sA=an.length;
+ const bd=(n,x)=>n>x?`<i>${n-x}</i>`:"",tabs=mf?`<div class="tabs"><button class="${ctab==="c"?"on":""}" onclick="setTab('c')">💬 Chat${ctab==="a"?bd(cm.length,sC):""}</button><button class="${ctab==="a"?"on":""}" onclick="setTab('a')">📣 Announcements${ctab==="c"?bd(an.length,sA):""}</button></div>`:"<h2>💬 Chat</h2>",
+ inp=`<div class="send"><input id="ci" placeholder="${narr()?"Announce to everyone":"Message"}" maxlength="200" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Send</button></div>`;
+ return `<div class="card">${tabs}<div class="chat" id="cl">${sh.length?sh.map(c=>c.ann?`<div class="ann">📣 ${esc(c.text)}</div>`:`<div><b class="${c.pid===me?"me":""}">${c.to==="maf"?"🔪 ":c.to==="dead"?"👻 ":""}${esc(c.name)}:</b> ${esc(c.text)}</div>`).join(""):'<span class="mu">Nothing yet…</span>'}</div>${canChat()?(!mf||ctab==="c"||narr()?inp:""):(!mf||ctab==="c"?'<p class="mu">🌙 Night: chat is closed.</p>':"")}</div>`}
 function pleas(){return `<div class="card"><h2>Plead your case:</h2>${A().map(p=>`<div class="plea"><b>${esc(p.name)}</b><br>${esc(p["pl"+room.gid]||"—")}</div>`).join("")}</div>`}
 function next(){room.r<room.R?rdoc().update({phase:"answer",r:room.r+1}):rdoc().update({phase:"plead"})}
-function chips(f){return '<div class="chips">'+L().map(p=>`<span class="${f&&f(p)?"done":""}">${esc(p.name)}${p.id===room.host?" 👑":""}</span>`).join("")+"</div>"}
+function chips(f){return '<div class="chips">'+L().map(p=>`<span class="${f&&f(p)?"done":""}">${p.pfp?av(p.pfp,20)+" ":""}${esc(p.name)}${p.id===room.host?" 👑":""}</span>`).join("")+"</div>"}
 function hub(){return `<h2>Game library</h2><div class="grid">
 <div class="game"><b>🕵️ Guess the Imposter</b><span class="tag live">playable · 4 modes</span><p class="mu">Categories, Who is most likely to, Random questions, or your own question.</p></div>
 <div class="game"><b>🎭 Mafia / Among Us</b><span class="tag live">playable</span><p class="mu">Mafia, Doctor, Detective, Revealer, Plotter. Play or narrate.</p></div>
 <div class="game"><b>🔥 1 to 100</b><span class="tag">coming soon</span><p class="mu">Hot or cold guessing with a 1–100 closeness score.</p></div>
 <div class="game"><b>🎨 Skribbl / 🌍 OpenGuessr</b><span class="tag">play on their sites</span><p class="mu">Make a private room there and share the link in your group.</p></div></div>`}
 function render(){
-  if(!unlocked)return;
+  if(!user||scr)return authView();
   const a=$("#app");
   if(db===null){a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Connecting… (open this page from the shared Claude link and sign in)</p>`;return}
   if(!room||!code){
     a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Play with your friends, from anywhere.</p>
-    <div class="card"><input id="nm" autocomplete="off" placeholder="Your name" value="${esc(name)}" maxlength="14">
+    <div class="card"><div class="me-bar">${av(user.pf,44)}<b>${esc(user.name)}</b><button class="alt" onclick="openProf()">Change profile</button><button class="alt" onclick="logout()">Log out</button></div>
     <div style="margin-top:10px"><input id="cd" placeholder="Room code" value="${esc(code)}" maxlength="6" style="text-transform:uppercase;width:130px">
     <button onclick="enter($('#cd').value,false)">Join</button>
     <button class="alt" onclick="enter(Math.random().toString(36).slice(2,6).toUpperCase(),true)">Create room</button></div>
@@ -161,7 +227,7 @@ function render(){
   const f=document.activeElement&&document.activeElement.id,v=f&&document.activeElement.value;
   a.innerHTML=h;if(f&&$("#"+f)){$("#"+f).value=v;$("#"+f).focus()}const cl=$("#cl");if(cl)cl.scrollTop=cl.scrollHeight;updTm()
 }
-gate();
+autoLogin();
 function gate(){let ok=false;try{ok=sessionStorage.gn_ok===PASSWORD}catch(e){}
  if(ok){unlocked=true;return render()}
  $("#app").innerHTML=`<h1>🔒 Game Night</h1><div class="card"><p class="mu">Enter the password to continue.</p><input id="pw" type="password" placeholder="Password"><button onclick="unlock()">Enter</button><p id="pe" style="color:var(--ac)"></p></div>`;
@@ -248,7 +314,7 @@ setInterval(()=>{updTm();mtick()},1000);
 function updTm(){const e=$("#tm");if(e&&room&&room.dl)e.textContent=Math.max(0,Math.ceil((room.dl-Date.now())/1000))+"s"}
 function mafView(){
  const ph=room.phase,d=room.d,g=room.gid,R=room.roles,mr=R[me],nr=narr(),dm=dead(me),al=A().filter(p=>!dead(p.id)),mp=P.find(p=>p.id===me)||{},sfx=g+"_"+d;
- const all=A().map(p=>esc(p.name)+": "+RN[R[p.id]]+(dead(p.id)?" 💀":"")).join(" · ");let h="";
+ const all=A().map(p=>esc(p.name)+": "+RN[R[p.id]]+(dead(p.id)?" 💀":"")).join(" · ");let h=stage();
  if(nr)h+=`<div class="card"><h2>🎙️ You are the narrator</h2><p class="mu">${all}</p>${room.po?`<p class="mu">Plotter target: <b>${esc(nm(room.tgt))}</b></p>`:""}</div>`;
  else h+=`<div class="card"><h2>${dm?"💀 You're dead":"Your role: "+RN[mr]}</h2><p class="mu">${RD[mr]||""}</p>${mr==="maf"?`<p>Team: ${A().filter(p=>R[p.id]==="maf").map(p=>esc(p.name)).join(", ")}</p>`:""}${mr==="plo"?`<p>Your target: <b>${esc(nm(room.tgt))}</b></p>`:""}${dm||ph==="mend"?`<p class="mu">${all}</p>`:""}</div>`;
  if(ph==="mend")return h+`<div class="card"><h2>🏁 ${esc(room.winner)}</h2><p class="mu">${all}</p>${isHost()?`<button onclick="rdoc().update({phase:'lobby'})">Play again</button>`:""}</div>`;
@@ -269,5 +335,5 @@ function mafView(){
   if(ok&&mr==="rev"&&!room.ru)h+=mp["rv"+g]===d?`<p>📢 Reveal armed.</p>`:`<button onclick="say('rv${g}',${d})">📢 Arm reveal (once)</button>`;
   h+=`<div class="chips">${al.map(p=>`<span class="${p[V]!==undefined?"done":""}">${esc(p.name)}</span>`).join("")}</div>`}
  return h+"</div>"}
-Object.assign(window,{unlock,draftM,openMaf,closeMaf,startMaf,sendChat,enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
+Object.assign(window,{doLogin,goScr,checkSite,openProf,cancelProf,logout,sfset,setG,setPf,saveProf,setTab,unlock,draftM,openMaf,closeMaf,startMaf,sendChat,enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
 </script></body></html>
