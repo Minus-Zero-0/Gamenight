@@ -24,8 +24,15 @@ button:disabled{opacity:.4}
 .code{font-size:1.6rem;letter-spacing:.3em;font-weight:800}
 table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;border-bottom:1px solid #ffffff14}
 .big{font-size:1.1rem}
+.chat{max-height:200px;overflow-y:auto;padding:8px;border-radius:12px;background:#ffffff0d;margin-bottom:8px}
+.chat div{margin:4px 0;word-break:break-word}.chat b{color:var(--ac)}.chat b.me{color:var(--ok)}
+.send{display:flex;gap:6px}.send input{flex:1;min-width:0}
+.ann{background:#7c5cff33;border-left:3px solid var(--ac);padding:6px 8px;border-radius:8px}
+.plea{padding:10px 12px;margin:6px 0;border-radius:12px;background:#ffffff0d}
 </style></head><body><main id="app"></main>
 <script type="module">
+const PASSWORD="gamenight"; // <-- change the password here
+let unlocked=false;
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={
@@ -48,13 +55,13 @@ const RQ=[["Most days you have gone without bathing?","How many hours do you sle
 const GAMES={cat:"Categories",mlt:"Who is most likely to",rq:"Random questions",own:"Host's question"};
 const $=s=>document.querySelector(s),pick=a=>a[Math.floor(Math.random()*a.length)];
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let db=null,me,name="",code="",room=null,P=[],unsub=[],err="",setupOpen=false;const draft={m:"",a:"",R:1};
+let mafSetup=false,mkey="",seq=0,CH=[],db=null,me,name="",code="",room=null,P=[],unsub=[],err="",setupOpen=false;const draft={m:"",a:"",R:1};
 try{me=sessionStorage.gn_id}catch(e){}
 if(!me){me="p"+Math.random().toString(36).slice(2,9);try{sessionStorage.gn_id=me}catch(e){}}
 db=fb;
 const rdoc=()=>db.doc("rooms/"+code),pcol=()=>db.collection("rooms/"+code+"/players"),pdoc=()=>pcol().doc(me);
 const isHost=()=>room&&room.host===me;
-const A=()=>room&&room.game==="own"?P.filter(p=>p.id!==room.host):P; // players who answer/vote (quizmaster sits out)
+const A=()=>room&&(room.game==="own"||room.game==="maf"&&room.narr)?P.filter(p=>p.id!==room.host):P; // players who answer/vote (quizmaster sits out)
 const L=()=>room&&room.phase==="lobby"?P:A();
 const nm=id=>(P.find(p=>p.id===id)||{}).name||"?";
 const T=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({message:"Timed out. Create the Firestore database (test mode) in the Firebase console, then reload."}),7000))]);
@@ -62,20 +69,23 @@ window.addEventListener("unhandledrejection",e=>{err=String((e.reason&&e.reason.
 async function enter(c,create){
   name=$("#nm").value.trim();if(!name){err="Type your name first";render();return}c=c.toUpperCase().trim();if(!c){err="Enter a room code";render();return}
   
-  code=c;err="Connecting…";render();unsub.forEach(u=>u());
+  code=c;CH=[];err="Connecting…";render();unsub.forEach(u=>u());
   try{
     if(create)await T(rdoc().set({host:me,phase:"lobby"}));
     await T(pdoc().set({name,t:Date.now()}));err="";
     unsub=[rdoc().onSnapshot(s=>{room=s.exists?s.data():null;host();render()}),
-      pcol().onSnapshot(q=>{P=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);host();render()})];
+      pcol().onSnapshot(q=>{P=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);host();render()}),
+      db.collection("rooms/"+code+"/chat").onSnapshot(q=>{CH=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);render()})];
   }catch(e){err="Could not connect: "+(e.message||e.code)}
   render();
 }
 const sub=(p,k)=>p[k]!==undefined;
 function host(){ // host auto-advances when everyone has acted
   if(!isHost()||!P.length)return;
+  if(room.game==="maf"){mtick();return}
   const g=room.gid;
   if(room.phase==="answer"&&A().length&&A().every(p=>sub(p,g+"_"+room.r)))rdoc().update({phase:"reveal"});
+  if(room.phase==="plead"&&A().length&&A().every(p=>sub(p,"pl"+g)))rdoc().update({phase:"vote"});
   if(room.phase==="vote"&&A().length&&A().every(p=>sub(p,"v"+g)))rdoc().update({phase:"result"});
 }
 function start(game){
@@ -85,14 +95,23 @@ function start(game){
   rdoc().set({host:me,phase:"answer",game,gid:Date.now(),r:1,R:game==="cat"?3:1,imp,main,alt});
 }
 const say=(k,v)=>pdoc().update({[k]:v});
-function next(){room.r<room.R?rdoc().update({phase:"answer",r:room.r+1}):rdoc().update({phase:"vote"})}
+const dead=id=>(room.dead||[]).includes(id),narr=()=>room.game==="maf"&&room.narr&&isHost();
+const vis=c=>room.game!=="maf"||!c.to||c.to==="all"||narr()||dead(me)||c.to===(room.roles||{})[me]||c.to===me;
+function canChat(){return room.game!=="maf"||narr()||dead(me)||room.phase!=="mnight"||room.roles[me]==="maf"}
+function sendChat(){const el=$("#ci"),t=el.value.trim();if(!t)return;el.value="";const ts=Date.now();let x={};
+ if(room.game==="maf")x={to:narr()?"all":dead(me)?"dead":room.phase==="mnight"?"maf":"all",ann:narr()};
+ db.doc("rooms/"+code+"/chat/"+ts+"_"+me).set({gid:room.gid,name,pid:me,text:t.slice(0,200),t:ts,...x})}
+function chatCard(){const m=CH.filter(c=>c.gid===room.gid&&vis(c));return `<div class="card"><h2>💬 Chat</h2><div class="chat" id="cl">${m.length?m.map(c=>c.ann?`<div class="ann">📣 ${esc(c.text)}</div>`:`<div><b class="${c.pid===me?"me":""}">${c.to==="maf"?"🔪 ":c.to==="dead"?"👻 ":""}${esc(c.name)}:</b> ${esc(c.text)}</div>`).join(""):'<span class="mu">Say something…</span>'}</div>${canChat()?`<div class="send"><input id="ci" placeholder="${narr()?"Announce to everyone":"Message"}" maxlength="200" autocomplete="off" onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Send</button></div>`:'<p class="mu">🌙 Night: chat is closed.</p>'}</div>`}
+function pleas(){return `<div class="card"><h2>Plead your case:</h2>${A().map(p=>`<div class="plea"><b>${esc(p.name)}</b><br>${esc(p["pl"+room.gid]||"—")}</div>`).join("")}</div>`}
+function next(){room.r<room.R?rdoc().update({phase:"answer",r:room.r+1}):rdoc().update({phase:"plead"})}
 function chips(f){return '<div class="chips">'+L().map(p=>`<span class="${f&&f(p)?"done":""}">${esc(p.name)}${p.id===room.host?" 👑":""}</span>`).join("")+"</div>"}
 function hub(){return `<h2>Game library</h2><div class="grid">
 <div class="game"><b>🕵️ Guess the Imposter</b><span class="tag live">playable · 4 modes</span><p class="mu">Categories, Who is most likely to, Random questions, or your own question.</p></div>
-<div class="game"><b>🎭 Mafia / Among Us</b><span class="tag">coming soon</span><p class="mu">Roles dealt secretly, day/night phases.</p></div>
+<div class="game"><b>🎭 Mafia / Among Us</b><span class="tag live">playable</span><p class="mu">Mafia, Doctor, Detective, Revealer, Plotter. Play or narrate.</p></div>
 <div class="game"><b>🔥 1 to 100</b><span class="tag">coming soon</span><p class="mu">Hot or cold guessing with a 1–100 closeness score.</p></div>
 <div class="game"><b>🎨 Skribbl / 🌍 OpenGuessr</b><span class="tag">play on their sites</span><p class="mu">Make a private room there and share the link in your group.</p></div></div>`}
 function render(){
+  if(!unlocked)return;
   const a=$("#app");
   if(db===null){a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Connecting… (open this page from the shared Claude link and sign in)</p>`;return}
   if(!room||!code){
@@ -104,9 +123,10 @@ function render(){
     ${code&&!room?'<p class="mu">Waiting for room '+esc(code)+"…</p>":""}<p style="color:var(--ac)">${esc(err)}</p></div>`+hub();return}
   const g=room.gid,ph=room.phase;
   let h=`<h1>🎲 Game Night</h1><div class="mu">Room <span class="code">${esc(code)}</span> · you are ${esc(name)}</div>`;
-  if(ph==="lobby"){
+  if(room.game==="maf"&&ph!=="lobby")h+=mafView();
+  else if(ph==="lobby"){
     h+=`<div class="card"><h2>Players (${P.length})</h2>${chips()}<p class="mu">Share the room code. 5–7 players is ideal.</p></div>`;
-    h+=isHost()&&setupOpen?setupCard():isHost()?`<div class="card"><h2>Pick a game</h2>${Object.keys(GAMES).map(k=>`<button ${P.length<(k==="own"?4:3)?"disabled":""} onclick="${k==="own"?"openSetup()":"start('"+k+"')"}">${GAMES[k]}</button>`).join("")}<p class="mu">Need at least 3 players. Host's question needs you + 3 players.</p></div>`:`<p class="mu">Waiting for the host to pick a game…</p>`;
+    h+=isHost()&&mafSetup?mafSetupCard():isHost()&&setupOpen?setupCard():isHost()?`<div class="card"><h2>Pick a game</h2>${Object.keys(GAMES).map(k=>`<button ${P.length<(k==="own"?4:3)?"disabled":""} onclick="${k==="own"?"openSetup()":"start('"+k+"')"}">${GAMES[k]}</button>`).join("")}<button ${P.length<5?"disabled":""} onclick="openMaf()">🎭 Mafia</button><p class="mu">Need at least 3 players (Mafia: 5). Host's question needs you + 3 players.</p></div>`:`<p class="mu">Waiting for the host to pick a game…</p>`;
     h+=hub();
   }else if(ph==="answer"){
     const mine=me===room.imp?room.alt:room.main,k=g+"_"+room.r,mp=P.find(p=>p.id===me)||{},done=sub(mp,k),qm=room.game==="own"&&isHost();
@@ -115,12 +135,17 @@ function render(){
     else if(room.game==="mlt")h+=`<p>Pick a person:</p>`+P.map(p=>`<button class="alt" onclick="say('${k}',${esc(JSON.stringify(p.name)).replace(/'/g,"")})">${esc(p.name)}</button>`).join("");
     else h+=`<input id="ans" placeholder="${room.game==="cat"?"One vague clue":"Your answer"}" maxlength="60" style="width:100%"><button onclick="say('${k}',$('#ans').value.trim()||'—')">Submit</button>`;
     h+=chips(p=>sub(p,k))+"</div>";
-  }else if(ph==="reveal"||ph==="vote"||ph==="result"){
+  }else if(ph==="reveal"||ph==="plead"||ph==="vote"||ph==="result"){
     const upto=ph==="reveal"?room.r:room.R;
     h+=`<div class="card"><h2>Answers</h2><table><tr><th></th>${Array.from({length:upto},(_,i)=>`<th>${room.R>1?"R"+(i+1):"Answer"}</th>`).join("")}</tr>`+A().map(p=>`<tr><td><b>${esc(p.name)}</b></td>${Array.from({length:upto},(_,i)=>`<td>${esc(p[g+"_"+(i+1)])}</td>`).join("")}</tr>`).join("")+"</table>";
     if(ph==="reveal")h+=isHost()?`<button onclick="next()">${room.r<room.R?"Next round":"Go to voting"}</button>`:`<p class="mu">Host will continue…</p>`;
     h+="</div>";
     if(ph!=="reveal"&&room.game!=="cat"&&!(room.game==="own"&&ph==="vote"))h+=`<div class="card"><div class="mu">The real question was</div><div class="prompt">${esc(room.main)}</div></div>`;
+    if(ph==="plead"){
+      const mp=P.find(p=>p.id===me)||{};
+      h+=`<div class="card"><h2>Plead your case:</h2><p class="mu">Convince everyone you're not the imposter. Pleas are revealed when voting starts.</p>`+(isHost()&&room.game==="own"?`<p class="mu">Players are writing their pleas…</p>`:sub(mp,"pl"+g)?`<p class="mu">Plea locked in. Waiting for others…</p>`:`<input id="pl" placeholder="Why you're innocent…" maxlength="140" style="width:100%"><button onclick="say('pl${g}',$('#pl').value.trim()||'(no comment)')">Submit</button>`)+chips(p=>sub(p,"pl"+g))+(isHost()?`<button class="alt" onclick="rdoc().update({phase:'vote'})">Start voting now</button>`:"")+"</div>";
+    }
+    if(ph==="vote"||ph==="result")h+=pleas();
     if(ph==="vote"){
       const mp=P.find(p=>p.id===me)||{};
       h+=`<div class="card"><h2>Who is the imposter?</h2>`+(isHost()&&room.game==="own"?`<p class="mu">Players are voting…</p><button class="alt" onclick="rdoc().update({phase:'result'})">Show result now</button>`:sub(mp,"v"+g)?`<p class="mu">Vote cast. Waiting…</p>`:A().filter(p=>p.id!==me).map(p=>`<button class="alt" onclick="say('v${g}','${p.id}')">${esc(p.name)}</button>`).join(""))+chips(p=>sub(p,"v"+g))+"</div>";
@@ -132,10 +157,16 @@ function render(){
       <p>Votes: ${A().map(p=>esc(p.name)+" "+(t[p.id]||0)).join(" · ")}</p>${isHost()?`<button onclick="rdoc().update({phase:'lobby'})">Play again</button>`:""}</div>`;
     }
   }
+  if(ph!=="lobby")h+=chatCard();
   const f=document.activeElement&&document.activeElement.id,v=f&&document.activeElement.value;
-  a.innerHTML=h;if(f&&$("#"+f)){$("#"+f).value=v;$("#"+f).focus()}
+  a.innerHTML=h;if(f&&$("#"+f)){$("#"+f).value=v;$("#"+f).focus()}const cl=$("#cl");if(cl)cl.scrollTop=cl.scrollHeight;updTm()
 }
-render();
+gate();
+function gate(){let ok=false;try{ok=sessionStorage.gn_ok===PASSWORD}catch(e){}
+ if(ok){unlocked=true;return render()}
+ $("#app").innerHTML=`<h1>🔒 Game Night</h1><div class="card"><p class="mu">Enter the password to continue.</p><input id="pw" type="password" placeholder="Password"><button onclick="unlock()">Enter</button><p id="pe" style="color:var(--ac)"></p></div>`;
+ const i=$("#pw");i.focus();i.onkeydown=e=>{if(e.key==="Enter")unlock()}}
+function unlock(){if($("#pw").value===PASSWORD){try{sessionStorage.gn_ok=PASSWORD}catch(e){}unlocked=true;render()}else $("#pe").textContent="Wrong password"}
 function openSetup(){setupOpen=true;err="";render()}
 function closeSetup(){setupOpen=false;err="";render()}
 function setupCard(){return `<div class="card"><h2>Your own question</h2>
@@ -153,5 +184,90 @@ function startOwn(){
   setupOpen=false;err="";
   rdoc().set({host:me,phase:"answer",game:"own",gid:Date.now(),r:1,R:draft.R,imp:pick(pl).id,main:m,alt:a});
 }
-Object.assign(window,{enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
+
+const draftM={play:1,mc:0},RN={maf:"🔪 Mafia",doc:"💉 Doctor",det:"🔍 Detective",rev:"📢 Revealer",plo:"🃏 Plotter",vil:"🙂 Villager"};
+const RD={maf:"Kill one player each night. Don't get caught.",doc:"Save one player each night (not the same one twice in a row).",det:"Inspect one player each night.",rev:"Once, arm your reveal during a vote to expose the voted-out player's role.",plo:"Get your target voted out and you win alone.",vil:"Find the mafia and vote them out."};
+const PR={maf:"🔪 Mafia, wake up. Who do you want to kill?",doc:"💉 Doctor, wake up. Who do you want to save?",det:"🔍 Detective, wake up. Who do you want to inspect?"};
+const ann=(g,to,text)=>db.doc("rooms/"+code+"/chat/"+(Date.now())+"_s"+(seq++)).set({gid:g,name:"Narrator",pid:"sys",text,t:Date.now()+seq/1000,to,ann:true});
+const nf=(R,dd)=>({phase:"mnight",q:["maf","doc","det"].filter(r=>Object.keys(R).some(i=>R[i]===r&&!dd.includes(i))),qi:0,dl:Date.now()+30000,tied:null});
+function openMaf(){mafSetup=true;err="";render()}function closeMaf(){mafSetup=false;render()}
+function mafSetupCard(){const n=P.length-(draftM.play?0:1),mx=Math.max(1,Math.floor((n-1)/2));return `<div class="card"><h2>🎭 Mafia setup</h2><p>Do you want to play, or narrate?</p><button class="${draftM.play?"":"alt"}" onclick="draftM.play=1;render()">I'll play</button><button class="${draftM.play?"alt":""}" onclick="draftM.play=0;render()">I'll narrate</button>
+<p class="mu">Number of mafia:</p><select onchange="draftM.mc=+this.value"><option value="0">Auto</option>${Array.from({length:mx},(_,i)=>`<option value="${i+1}" ${draftM.mc===i+1?"selected":""}>${i+1}</option>`).join("")}</select>
+<p class="mu">Needs 5+ players who play. Doctor and Detective always; Revealer at 7+, Plotter at 8+.</p><button onclick="startMaf()">Start game</button><button class="alt" onclick="closeMaf()">Back</button><p style="color:var(--ac)">${esc(err)}</p></div>`}
+function startMaf(){
+ const nr=!draftM.play,pl=P.filter(p=>!nr||p.id!==me).map(p=>p.id),n=pl.length;
+ if(n<5){err="Need at least 5 players who play";render();return}
+ const mc=Math.min(draftM.mc||(n<7?1:n<11?2:3),Math.max(1,Math.floor((n-1)/2))),sh=[...pl].sort(()=>Math.random()-.5),R={};
+ let rl=Array(mc).fill("maf").concat(["doc","det"]);if(n>=7)rl.push("rev");if(n>=8)rl.push("plo");while(rl.length<n)rl.push("vil");
+ sh.forEach((id,i)=>R[id]=rl[i]);
+ const po=sh.find(id=>R[id]==="plo")||null,tgt=po?pick(sh.filter(id=>R[id]!=="maf"&&id!==po)):null,g=Date.now(),f=nf(R,[]);
+ mafSetup=false;err="";mkey="";
+ rdoc().set({host:me,game:"maf",gid:g,narr:nr,roles:R,po,tgt,dead:[],d:1,ru:false,docLast:null,...f});
+ ann(g,"all","🌙 Night falls. Everyone close your eyes.");ann(g,"maf",PR.maf);
+}
+const tal=a=>{const c={};a.forEach(x=>c[x]=(c[x]||0)+1);const m=Math.max(0,...Object.values(c)),t=Object.keys(c).filter(k=>c[k]===m);return t.length?pick(t):null};
+const fin=(u,w)=>{ann(room.gid,"all","🏁 "+w);rdoc().update({...u,phase:"mend",winner:w})};
+function winner(dd,R){const al=A().filter(p=>!dd.includes(p.id)),m=al.filter(p=>R[p.id]==="maf").length;return !m?"Villagers win! 🎉":m>=al.length-m?"The Mafia wins! 😈":null}
+function toNight(dd,R,u={}){const f=nf(R,dd),g=room.gid;rdoc().update({...u,dead:dd,roles:R,d:room.d+1,...f});ann(g,"all","🌙 Night falls. Everyone close your eyes.");ann(g,f.q[0],PR[f.q[0]])}
+function nightStep(r){
+ const g=room.gid,F="n"+g+"_"+room.d,R=room.roles,ac=A().filter(p=>R[p.id]===r&&!dead(p.id));
+ if(r==="det"&&ac[0]&&ac[0][F])ann(g,ac[0].id,"🔍 "+nm(ac[0][F])+(R[ac[0][F]]==="maf"?" IS mafia. 🔪":" is NOT mafia."));
+ const nx=room.qi+1;
+ if(nx<room.q.length){rdoc().update({qi:nx,dl:Date.now()+30000});ann(g,room.q[nx],PR[room.q[nx]]);return}
+ const al=A().filter(p=>!dead(p.id)),kv=tal(al.filter(p=>R[p.id]==="maf").map(p=>p[F]).filter(Boolean)),sv=(al.find(p=>R[p.id]==="doc")||{})[F],k=kv&&kv!==sv?kv:null;
+ let dd=[...room.dead],R2={...R},msg="☀️ Morning. Nobody died last night.";
+ if(k){dd.push(k);msg="☀️ Morning. "+nm(k)+" was killed in the night.";if(room.po&&room.tgt===k&&R2[room.po]==="plo"){R2[room.po]="vil";ann(g,room.po,"Your target died. You are now a plain villager.")}}
+ ann(g,"all",msg);const w=winner(dd,R2);
+ if(w)return fin({dead:dd,roles:R2},w);
+ rdoc().update({phase:"mtalk",dead:dd,roles:R2,docLast:sv||null,dl:Date.now()+75000});ann(g,"all","💬 Discuss! You have 75 seconds.");
+}
+function toVote(ph){rdoc().update({phase:ph,dl:Date.now()+30000});ann(room.gid,"all",ph==="mvote"?"🗳️ Voting begins: 30 seconds. Pleas are shown beside each name.":"🗳️ Tie-break vote: 30 seconds.")}
+function resolveVote(two){
+ const g=room.gid,f=(two?"w":"v")+g+"_"+room.d;let vs=A().filter(p=>!dead(p.id)).map(p=>p[f]).filter(Boolean);if(two)vs=vs.filter(v=>room.tied.includes(v));
+ const c={};vs.forEach(v=>c[v]=(c[v]||0)+1);const m=Math.max(0,...Object.values(c)),top=Object.keys(c).filter(k=>c[k]===m);
+ if(!top.length){ann(g,"all","⚖️ Nobody voted. No one is eliminated.");return toNight([...room.dead],room.roles)}
+ if(top.length>1&&!two){rdoc().update({phase:"mplead2",tied:top,dl:Date.now()+15000});return ann(g,"all","🤝 Tie between "+top.map(nm).join(" and ")+". Tied players, plead your case again (15s).")}
+ if(top.length>1)ann(g,"all","🎲 Tied again. Fate chooses.");
+ const id=pick(top),R=room.roles,dd=[...room.dead,id],rv=!room.ru&&A().some(p=>R[p.id]==="rev"&&!dead(p.id)&&p["rv"+g]===room.d);
+ ann(g,"all","⚖️ "+nm(id)+" was voted out."+(rv?" Revealed role: "+RN[R[id]]+".":""));
+ const u={dead:dd,ru:room.ru||rv};
+ if(room.po&&R[room.po]==="plo"&&room.tgt===id&&!dd.includes(room.po))return fin(u,"🃏 "+nm(room.po)+" the Plotter wins alone!");
+ const w=winner(dd,R);w?fin(u,w):toNight(dd,R,u);
+}
+function mtick(){
+ if(!isHost()||!room||room.game!=="maf"||!room.roles)return;
+ const ph=room.phase,g=room.gid,d=room.d,over=Date.now()>room.dl,al=A().filter(p=>!dead(p.id)),all=(s,a=al)=>a.length>0&&a.every(p=>p[s+g+"_"+d]!==undefined),key=ph+g+d+room.qi,go=fn=>{if(mkey===key)return;mkey=key;fn()};
+ if(ph==="mnight"){const r=room.q[room.qi];if(over||all("n",al.filter(p=>room.roles[p.id]===r)))go(()=>nightStep(r))}
+ else if(ph==="mtalk"){if(over)go(()=>{rdoc().update({phase:"mplead",dl:Date.now()+15000});ann(g,"all","✍️ Plead your case! 15 seconds, everyone writes at once.")})}
+ else if(ph==="mplead"){if(over||all("pl"))go(()=>toVote("mvote"))}
+ else if(ph==="mplead2"){if(over||all("pt",al.filter(p=>room.tied.includes(p.id))))go(()=>toVote("mvote2"))}
+ else if(ph==="mvote"){if(over||all("v"))go(()=>resolveVote(false))}
+ else if(ph==="mvote2"){if(over||all("w"))go(()=>resolveVote(true))}
+}
+setInterval(()=>{updTm();mtick()},1000);
+function updTm(){const e=$("#tm");if(e&&room&&room.dl)e.textContent=Math.max(0,Math.ceil((room.dl-Date.now())/1000))+"s"}
+function mafView(){
+ const ph=room.phase,d=room.d,g=room.gid,R=room.roles,mr=R[me],nr=narr(),dm=dead(me),al=A().filter(p=>!dead(p.id)),mp=P.find(p=>p.id===me)||{},sfx=g+"_"+d;
+ const all=A().map(p=>esc(p.name)+": "+RN[R[p.id]]+(dead(p.id)?" 💀":"")).join(" · ");let h="";
+ if(nr)h+=`<div class="card"><h2>🎙️ You are the narrator</h2><p class="mu">${all}</p>${room.po?`<p class="mu">Plotter target: <b>${esc(nm(room.tgt))}</b></p>`:""}</div>`;
+ else h+=`<div class="card"><h2>${dm?"💀 You're dead":"Your role: "+RN[mr]}</h2><p class="mu">${RD[mr]||""}</p>${mr==="maf"?`<p>Team: ${A().filter(p=>R[p.id]==="maf").map(p=>esc(p.name)).join(", ")}</p>`:""}${mr==="plo"?`<p>Your target: <b>${esc(nm(room.tgt))}</b></p>`:""}${dm||ph==="mend"?`<p class="mu">${all}</p>`:""}</div>`;
+ if(ph==="mend")return h+`<div class="card"><h2>🏁 ${esc(room.winner)}</h2><p class="mu">${all}</p>${isHost()?`<button onclick="rdoc().update({phase:'lobby'})">Play again</button>`:""}</div>`;
+ const T={mnight:"🌙 Night",mtalk:"☀️ Day: discuss",mplead:"Plead your case:",mplead2:"Tie: plead again",mvote:"🗳️ Vote someone out",mvote2:"🗳️ Tie-break vote"}[ph];
+ h+=`<div class="card"><h2>${T}</h2><div class="mu">⏱ <span id="tm"></span> ${isHost()?`<button class="alt" onclick="rdoc().update({dl:1})">⏭ Skip</button>`:""}</div><div class="chips">${A().map(p=>`<span class="${dead(p.id)?"":"done"}">${dead(p.id)?"💀 ":""}${esc(p.name)}</span>`).join("")}</div>`;
+ const ok=!dm&&!nr;
+ if(ph==="mnight"){const r=room.q[room.qi];
+  if(nr)h+=`<p class="mu">Waiting for ${RN[r]}…</p>`;
+  else if(ok&&mr===r){const F="n"+sfx;h+=mp[F]!==undefined?`<p class="mu">Choice locked in.</p>`:`<p>${PR[r]}</p>`+al.filter(p=>r==="maf"?R[p.id]!=="maf":r==="det"?p.id!==me:p.id!==room.docLast).map(p=>`<button class="alt" onclick="say('${F}','${p.id}')">${esc(p.name)}</button>`).join("")}
+  else h+=`<p class="mu">Close your eyes…</p>`}
+ else if(ph==="mtalk")h+=`<p class="mu">Discuss in the chat below.</p>`;
+ else if(ph==="mplead"||ph==="mplead2"){const F=(ph==="mplead"?"pl":"pt")+sfx;
+  if(ok&&(ph==="mplead"||room.tied.includes(me)))h+=mp[F]!==undefined?`<p class="mu">Plea locked in.</p>`:`<input id="pl" placeholder="Why you're innocent…" maxlength="140" style="width:100%"><button onclick="say('${F}',$('#pl').value.trim()||'(no comment)')">Submit</button>`;
+  else h+=`<p class="mu">${ph==="mplead2"?"Waiting for the tied players…":"Waiting for pleas…"}</p>`}
+ else{const two=ph==="mvote2",V=(two?"w":"v")+sfx,rows=(two?room.tied:al.map(p=>p.id));
+  h+=`<table>${rows.map(id=>{const p=P.find(x=>x.id===id)||{};return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p[(two?"pt":"pl")+sfx]||"—")}</td><td>${ok&&mp[V]===undefined&&id!==me?`<button class="alt" onclick="say('${V}','${id}')">Vote</button>`:""}</td></tr>`}).join("")}</table>`;
+  if(ok&&mp[V]!==undefined)h+=`<p class="mu">Vote cast. Waiting…</p>`;
+  if(ok&&mr==="rev"&&!room.ru)h+=mp["rv"+g]===d?`<p>📢 Reveal armed.</p>`:`<button onclick="say('rv${g}',${d})">📢 Arm reveal (once)</button>`;
+  h+=`<div class="chips">${al.map(p=>`<span class="${p[V]!==undefined?"done":""}">${esc(p.name)}</span>`).join("")}</div>`}
+ return h+"</div>"}
+Object.assign(window,{unlock,draftM,openMaf,closeMaf,startMaf,sendChat,enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
 </script></body></html>
