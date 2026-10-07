@@ -46,12 +46,26 @@ table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;bord
 .tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1;margin:0;background:var(--fld);border:1.5px solid var(--bd);color:var(--tx)}
 .tabs button.on{background:linear-gradient(90deg,var(--ac),var(--ac2));border:0;color:#fff}.tabs i{background:var(--ac);color:#fff;border-radius:99px;padding:0 6px;margin-left:6px;font-style:normal;font-size:.75rem}
 @media(prefers-reduced-motion:reduce){.scr .fx{animation:none}}
+.scr{flex-direction:column;gap:8px;overflow:hidden;position:relative}
+.scr.night{background:linear-gradient(#000b,#000b),url(images/night.webp) center/cover}
+.scr.day{background:linear-gradient(#0009,#0009),url(images/morning.webp) center/cover}
+.fa{position:relative;width:64px;height:64px;flex:none}
+.fl{animation:fling 5s ease-in both}
+@keyframes fling{0%,12%{transform:none}100%{transform:translate(380px,-220px) rotate(1800deg) scale(.15)}}
+.hf{position:absolute;inset:0;animation:5s ease-in both}
+.hf.a{clip-path:polygon(0 0,100% 0,0 100%);animation-name:sa}
+.hf.b{clip-path:polygon(100% 0,100% 100%,0 100%);animation-name:sb}
+@keyframes sa{0%,30%{transform:none}100%{transform:translate(-50px,160px) rotate(-30deg);opacity:0}}
+@keyframes sb{0%,30%{transform:none}100%{transform:translate(50px,190px) rotate(30deg);opacity:0}}
+.sl{position:absolute;inset:-6px;background:linear-gradient(to top left,transparent 47%,#fff 48.5%,#fff 51.5%,transparent 53%);opacity:0;animation:sl 5s linear both}
+@keyframes sl{0%,29%{opacity:0}30%{opacity:1}42%,100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.fl,.hf,.sl{animation:none}}
 </style></head><body><main id="app"></main>
 <script type="module">
 const PASSWORD="gamenight"; // <-- change the password here
 let unlocked=false;
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,getDoc,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,getDoc,runTransaction,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={
   apiKey:"AIzaSyAwguuhyo7R0HAivjHLJJDgcfDpxij2nN4",
   authDomain:"gamenight-38743.firebaseapp.com",
@@ -63,7 +77,7 @@ const firebaseConfig={
 const fdb=getFirestore(initializeApp(firebaseConfig));
 const wrap=n=>s=>n({exists:s.exists(),data:()=>s.data()});
 const fb={
-  doc:p=>{const r=doc(fdb,p);return{set:d=>setDoc(r,d),update:d=>updateDoc(r,d),onSnapshot:(n,e)=>onSnapshot(r,wrap(n),e)}},
+  doc:p=>{const r=doc(fdb,p);return{delete:()=>deleteDoc(r),set:d=>setDoc(r,d),update:d=>updateDoc(r,d),onSnapshot:(n,e)=>onSnapshot(r,wrap(n),e)}},
   collection:p=>{const c=collection(fdb,p);return{doc:id=>fb.doc(p+"/"+id),onSnapshot:(n,e)=>onSnapshot(c,n,e)}}
 };
 const CAT=[["Pizza","Italian food"],["Elephant","Big animal"],["Cricket","A sport"],["Hyderabad","A city"],["Biryani","A dish"],["Netflix","Streaming"],["Guitar","Instrument"],["Beach","A place"],["Rain","Weather"],["Doctor","A profession"],["Bicycle","Transport"],["Mango","A fruit"]];
@@ -72,13 +86,13 @@ const RQ=[["Most days you have gone without bathing?","How many hours do you sle
 const GAMES={cat:"Categories",mlt:"Who is most likely to",rq:"Random questions",own:"Host's question"};
 const $=s=>document.querySelector(s),pick=a=>a[Math.floor(Math.random()*a.length)];
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let mafSetup=false,mkey="",seq=0,CH=[],db=null,me,name="",code="",room=null,P=[],unsub=[],err="",setupOpen=false;const draft={m:"",a:"",R:1};
+let mafSetup=false,mkey="",seq=0,CH=[],db=null,me,name="",code="",room=null,P=[],unsub=[],err="",setupOpen=false;const draft={m:"",a:"",R:1};let chInit=false,fxS={},lastSx=null,PRAW=[],psig="",rsig="",RL=[],revK="",revA="";
 try{me=sessionStorage.gn_id}catch(e){}
 if(!me){me="p"+Math.random().toString(36).slice(2,9);try{sessionStorage.gn_id=me}catch(e){}}
 db=fb;
 const rdoc=()=>db.doc("rooms/"+code),pcol=()=>db.collection("rooms/"+code+"/players"),pdoc=()=>pcol().doc(me);
 const isHost=()=>room&&room.host===me;
-const A=()=>room&&(room.game==="own"||room.game==="maf"&&room.narr)?P.filter(p=>p.id!==room.host):P; // players who answer/vote (quizmaster sits out)
+const PL=()=>room&&room.ids?P.filter(p=>room.ids.includes(p.id)):P,A=()=>room&&(room.game==="own"||room.game==="maf"&&room.narr)?PL().filter(p=>p.id!==room.host):PL(); // players who answer/vote (quizmaster sits out)
 const L=()=>room&&room.phase==="lobby"?P:A();
 const nm=id=>(P.find(p=>p.id===id)||{}).name||"?";
 const T=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({message:"Timed out. Create the Firestore database (test mode) in the Firebase console, then reload."}),7000))]);
@@ -129,18 +143,17 @@ function stage(){const ps=A(),n=ps.length,w=n<9?3:4,t=Math.max(1,Math.floor((n-w
  c=(p,r,k)=>`<div class="pc ${dead(p.id)?"dd":""}" style="grid-area:${r}/${k}">${av(p.pfp,46)}<small>${esc(p.name)}</small></div>`,
  lat=CH.filter(x=>x.gid===room.gid&&x.ann&&vis(x)).pop(),fx=lat&&lat.id!==shown?"fx":"";shown=lat?lat.id:"";
  const cells=ps.slice(0,w).map((p,i)=>c(p,1,i+1)).join("")+ps.slice(w,w+t).map((p,j)=>c(p,j+2,1)).join("")+ps.slice(w+t,w+2*t).map((p,j)=>c(p,j+2,w)).join("")+ps.slice(w+2*t).map((p,k)=>c(p,t+2,k+1)).join("");
- return `<div class="stage" style="grid-template-columns:${["1fr",...Array(w-2).fill(3/(w-2)+"fr"),"1fr"].join(" ")}">${cells}<div class="scr" style="grid-area:2/2/${t+2}/${w}"><div class="${fx}">${lat?esc(lat.text):"The game begins…"}</div></div><div class="lg" style="grid-area:${t+2}/${b+1}/${t+3}/${w+1}"><span>🎭</span><b>MAFIA</b></div></div>`}
+ return `<div class="stage" style="grid-template-columns:${["1fr",...Array(w-2).fill(3/(w-2)+"fr"),"1fr"].join(" ")}">${cells}<div class="scr ${room.phase==="mnight"?"night":"day"}" style="grid-area:2/2/${t+2}/${w}">${fxHtml(lat)}<div class="${fx}">${lat?esc(lat.text):"The game begins…"}</div></div><div class="lg" style="grid-area:${t+2}/${b+1}/${t+3}/${w+1}"><span>🎭</span><b>MAFIA</b></div></div>`}
 window.addEventListener("unhandledrejection",e=>{err=String((e.reason&&e.reason.message)||e.reason);render()});
 async function enter(c,create){
-  name=user.name;c=c.toUpperCase().trim();if(!c){err="Enter a room code";render();return}
-  
-  code=c;CH=[];err="Connecting…";render();unsub.forEach(u=>u());
+  name=user.name;c=c.toUpperCase().trim();if(!c)return;
+  code=c;CH=[];PRAW=[];P=[];psig=rsig="";chInit=false;lastSx=null;err="Connecting…";render();unsub.forEach(u=>u());
   try{
-    if(create)await T(rdoc().set({host:me,phase:"lobby"}));
-    await T(pdoc().set({name,t:Date.now(),pfp:user.pf}));err="";
-    unsub=[rdoc().onSnapshot(s=>{room=s.exists?s.data():null;host();render()}),
-      pcol().onSnapshot(q=>{P=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);host();render()}),
-      db.collection("rooms/"+code+"/chat").onSnapshot(q=>{CH=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);render()})];
+    if(create)await T(rdoc().set({host:me,phase:"lobby",title:name+"'s room",hb:Date.now(),pc:1}));
+    await T(pdoc().set({name,t:Date.now(),ls:Date.now(),pfp:user.pf}));err="";
+    unsub=[rdoc().onSnapshot(s=>{room=s.exists?s.data():null;sxCheck();const sg=room?JSON.stringify((({hb,pc,...r})=>r)(room)):"";if(sg===rsig)return;rsig=sg;host();render()}),
+      pcol().onSnapshot(q=>{PRAW=q.docs.map(d=>({id:d.id,...d.data()}));if(setP()){host();render();if(isHost())beat()}}),
+      db.collection("rooms/"+code+"/chat").onSnapshot(q=>{CH=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);if(!chInit){chInit=true;CH.forEach(c=>fxS[c.id]=-1e12)}render()})];
   }catch(e){err="Could not connect: "+(e.message||e.code)}
   render();
 }
@@ -157,7 +170,7 @@ function start(game){
   const imp=pick(P).id;let main,alt;
   if(game==="cat"){const [w,h]=pick(CAT);main="The word is: "+w;alt="Your hint: "+h}
   else{[main,alt]=pick(game==="mlt"?MLT:RQ)}
-  rdoc().set({host:me,phase:"answer",game,gid:Date.now(),r:1,R:game==="cat"?3:1,imp,main,alt});
+  rdoc().set({host:me,ids:P.map(p=>p.id),title:room.title,hb:Date.now(),pc:P.length,phase:"answer",game,gid:Date.now(),r:1,R:game==="cat"?3:1,imp,main,alt});
 }
 const say=(k,v)=>pdoc().update({[k]:v});
 const dead=id=>(room.dead||[]).includes(id),narr=()=>room.game==="maf"&&room.narr&&isHost();
@@ -186,15 +199,14 @@ function render(){
   const a=$("#app");
   if(db===null){a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Connecting… (open this page from the shared Claude link and sign in)</p>`;return}
   if(!room||!code){
+    const rl=RL.filter(r=>Date.now()-(r.hb||0)<180000).sort((x,y)=>(y.hb||0)-(x.hb||0));
     a.innerHTML=`<h1>🎲 Game Night</h1><p class="mu">Play with your friends, from anywhere.</p>
     <div class="card"><div class="me-bar">${av(user.pf,44)}<b>${esc(user.name)}</b><button class="alt" onclick="openProf()">Change profile</button><button class="alt" onclick="logout()">Log out</button></div>
-    <div style="margin-top:10px"><input id="cd" placeholder="Room code" value="${esc(code)}" maxlength="6" style="text-transform:uppercase;width:130px">
-    <button onclick="enter($('#cd').value,false)">Join</button>
-    <button class="alt" onclick="enter(Math.random().toString(36).slice(2,6).toUpperCase(),true)">Create room</button></div>
-    ${code&&!room?'<p class="mu">Waiting for room '+esc(code)+"…</p>":""}<p style="color:var(--ac)">${esc(err)}</p></div>`+hub();return}
+    <div style="margin-top:10px"><button onclick="mkRoom()">Create room</button></div>${code&&!room?'<p class="mu">Connecting to the room…</p>':""}<p style="color:var(--ac)">${esc(err)}</p></div>
+    <div class="card"><h2>Open rooms</h2>${rl.length?rl.map(r=>`<div class="game" style="margin:8px 0"><b>${esc(r.title||"Room")}</b><span class="tag ${r.phase==="lobby"?"":"live"}">${rGame(r)}</span><p class="mu">${r.pc||1} in the room</p><button onclick="enter('${r.id}',false)">${r.phase==="lobby"?"Join":"Join and spectate"}</button></div>`).join(""):'<p class="mu">No open rooms yet. Create one and your friends will see it here.</p>'}</div>`+hub();return}
   const g=room.gid,ph=room.phase;
-  let h=`<h1>🎲 Game Night</h1><div class="mu">Room <span class="code">${esc(code)}</span> · you are ${esc(name)}</div>`;
-  if(room.game==="maf"&&ph!=="lobby")h+=mafView();
+  let h=`<h1>🎲 Game Night</h1><div class="mu">${esc(room.title||"Room")} · you are ${esc(name)} <button class="alt" onclick="leave()">Leave room</button></div>`;
+  if(isSpec())h+=specView();else if(room.game==="maf"&&ph!=="lobby")h+=mafView();
   else if(ph==="lobby"){
     h+=`<div class="card"><h2>Players (${P.length})</h2>${chips()}<p class="mu">Share the room code. 5–7 players is ideal.</p></div>`;
     h+=isHost()&&mafSetup?mafSetupCard():isHost()&&setupOpen?setupCard():isHost()?`<div class="card"><h2>Pick a game</h2>${Object.keys(GAMES).map(k=>`<button ${P.length<(k==="own"?4:3)?"disabled":""} onclick="${k==="own"?"openSetup()":"start('"+k+"')"}">${GAMES[k]}</button>`).join("")}<button ${P.length<5?"disabled":""} onclick="openMaf()">🎭 Mafia</button><p class="mu">Need at least 3 players (Mafia: 5). Host's question needs you + 3 players.</p></div>`:`<p class="mu">Waiting for the host to pick a game…</p>`;
@@ -253,14 +265,15 @@ function startOwn(){
   if(!m||!a){err="Fill in both boxes";render();return}
   if(pl.length<3){err="Need at least 3 players besides you";render();return}
   setupOpen=false;err="";
-  rdoc().set({host:me,phase:"answer",game:"own",gid:Date.now(),r:1,R:draft.R,imp:pick(pl).id,main:m,alt:a});
+  rdoc().set({host:me,ids:P.map(p=>p.id),title:room.title,hb:Date.now(),pc:P.length,phase:"answer",game:"own",gid:Date.now(),r:1,R:draft.R,imp:pick(pl).id,main:m,alt:a});
 }
 
 const draftM={play:1,mc:0},RN={maf:"🔪 Mafia",doc:"💉 Doctor",det:"🔍 Detective",rev:"📢 Revealer",plo:"🃏 Plotter",vil:"🙂 Villager"};
-const RD={maf:"Kill one player each night. Don't get caught.",doc:"Save one player each night (not the same one twice in a row).",det:"Inspect one player each night.",rev:"Once, arm your reveal during a vote to expose the voted-out player's role.",plo:"Get your target voted out and you win alone.",vil:"Find the mafia and vote them out."};
+const RD={maf:"Kill one player each night. Don't get caught.",doc:"Save one player each night (not the same one twice in a row).",det:"Inspect one player each night.",rev:"Once per game, in the last 10 seconds of the discussion, choose Yes to expose the voted-out player's role.",plo:"Get your target voted out and you win alone.",vil:"Find the mafia and vote them out."};
 const PR={maf:"🔪 Mafia, wake up. Who do you want to kill?",doc:"💉 Doctor, wake up. Who do you want to save?",det:"🔍 Detective, wake up. Who do you want to inspect?"};
-const ann=(g,to,text)=>db.doc("rooms/"+code+"/chat/"+(Date.now())+"_s"+(seq++)).set({gid:g,name:"Narrator",pid:"sys",text,t:Date.now()+seq/1000,to,ann:true});
-const nf=(R,dd)=>({phase:"mnight",q:["maf","doc","det"].filter(r=>Object.keys(R).some(i=>R[i]===r&&!dd.includes(i))),qi:0,dl:Date.now()+30000,tied:null});
+const ann=(g,to,text,x={})=>db.doc("rooms/"+code+"/chat/"+(Date.now())+"_s"+(seq++)).set({gid:g,name:"Narrator",pid:"sys",text,t:Date.now()+seq/1000,to,ann:true,...x});
+const sx=k=>({id:Date.now()+"_"+(seq++),k}),tdl=(R,dd,r)=>Date.now()+(Object.keys(R).some(i=>R[i]===r&&!dd.includes(i))?30000:5000+Math.floor(Math.random()*5000));
+const nf=(R,dd)=>({phase:"mnight",q:["maf","doc","det"],qi:0,dl:Date.now()+30000,tied:null});
 function openMaf(){mafSetup=true;err="";render()}function closeMaf(){mafSetup=false;render()}
 function mafSetupCard(){const n=P.length-(draftM.play?0:1),mx=Math.max(1,Math.floor((n-1)/2));return `<div class="card"><h2>🎭 Mafia setup</h2><p>Do you want to play, or narrate?</p><button class="${draftM.play?"":"alt"}" onclick="draftM.play=1;render()">I'll play</button><button class="${draftM.play?"alt":""}" onclick="draftM.play=0;render()">I'll narrate</button>
 <p class="mu">Number of mafia:</p><select onchange="draftM.mc=+this.value"><option value="0">Auto</option>${Array.from({length:mx},(_,i)=>`<option value="${i+1}" ${draftM.mc===i+1?"selected":""}>${i+1}</option>`).join("")}</select>
@@ -273,49 +286,82 @@ function startMaf(){
  sh.forEach((id,i)=>R[id]=rl[i]);
  const po=sh.find(id=>R[id]==="plo")||null,tgt=po?pick(sh.filter(id=>R[id]!=="maf"&&id!==po)):null,g=Date.now(),f=nf(R,[]);
  mafSetup=false;err="";mkey="";
- rdoc().set({host:me,game:"maf",gid:g,narr:nr,roles:R,po,tgt,dead:[],d:1,ru:false,docLast:null,...f});
+ rdoc().set({host:me,ids:P.map(p=>p.id),title:room.title,hb:Date.now(),pc:P.length,game:"maf",gid:g,narr:nr,roles:R,po,tgt,dead:[],d:1,ru:false,docLast:null,...f,sx:sx("mafia")});
  ann(g,"all","🌙 Night falls. Everyone close your eyes.");ann(g,"maf",PR.maf);
 }
 const tal=a=>{const c={};a.forEach(x=>c[x]=(c[x]||0)+1);const m=Math.max(0,...Object.values(c)),t=Object.keys(c).filter(k=>c[k]===m);return t.length?pick(t):null};
 const fin=(u,w)=>{ann(room.gid,"all","🏁 "+w);rdoc().update({...u,phase:"mend",winner:w})};
 function winner(dd,R){const al=A().filter(p=>!dd.includes(p.id)),m=al.filter(p=>R[p.id]==="maf").length;return !m?"Villagers win! 🎉":m>=al.length-m?"The Mafia wins! 😈":null}
-function toNight(dd,R,u={}){const f=nf(R,dd),g=room.gid;rdoc().update({...u,dead:dd,roles:R,d:room.d+1,...f});ann(g,"all","🌙 Night falls. Everyone close your eyes.");ann(g,f.q[0],PR[f.q[0]])}
+function toNight(dd,R,u={}){const f=nf(R,dd),g=room.gid;rdoc().update({...u,dead:dd,roles:R,d:room.d+1,...f,sx:sx("mafia")});ann(g,"all","🌙 Night falls. Everyone close your eyes.");ann(g,f.q[0],PR[f.q[0]])}
 function nightStep(r){
- const g=room.gid,F="n"+g+"_"+room.d,R=room.roles,ac=A().filter(p=>R[p.id]===r&&!dead(p.id));
- if(r==="det"&&ac[0]&&ac[0][F])ann(g,ac[0].id,"🔍 "+nm(ac[0][F])+(R[ac[0][F]]==="maf"?" IS mafia. 🔪":" is NOT mafia."));
- const nx=room.qi+1;
- if(nx<room.q.length){rdoc().update({qi:nx,dl:Date.now()+30000});ann(g,room.q[nx],PR[room.q[nx]]);return}
- const al=A().filter(p=>!dead(p.id)),kv=tal(al.filter(p=>R[p.id]==="maf").map(p=>p[F]).filter(Boolean)),sv=(al.find(p=>R[p.id]==="doc")||{})[F],k=kv&&kv!==sv?kv:null;
- let dd=[...room.dead],R2={...R},msg="☀️ Morning. Nobody died last night.";
- if(k){dd.push(k);msg="☀️ Morning. "+nm(k)+" was killed in the night.";if(room.po&&room.tgt===k&&R2[room.po]==="plo"){R2[room.po]="vil";ann(g,room.po,"Your target died. You are now a plain villager.")}}
- ann(g,"all",msg);const w=winner(dd,R2);
- if(w)return fin({dead:dd,roles:R2},w);
- rdoc().update({phase:"mtalk",dead:dd,roles:R2,docLast:sv||null,dl:Date.now()+75000});ann(g,"all","💬 Discuss! You have 75 seconds.");
-}
-function toVote(ph){rdoc().update({phase:ph,dl:Date.now()+30000});ann(room.gid,"all",ph==="mvote"?"🗳️ Voting begins: 30 seconds. Pleas are shown beside each name.":"🗳️ Tie-break vote: 30 seconds.")}
+ const g=room.gid,F="n"+g+"_"+room.d,R=room.roles,ac=A().filter(p=>R[p.id]===r&&!dead(p.id));let wait=0;
+ if(r==="det"&&ac[0]&&ac[0][F]){ann(g,ac[0].id,"🔍 "+nm(ac[0][F])+(R[ac[0][F]]==="maf"?" IS mafia. 🔪":" is NOT mafia."));wait=4000}
+ setTimeout(()=>{
+  const nx=room.qi+1;
+  if(nx<room.q.length){const n2=room.q[nx];rdoc().update({qi:nx,dl:tdl(R,room.dead,n2),sx:sx(n2)});ann(g,n2,PR[n2]);return}
+  const al=A().filter(p=>!dead(p.id)),kv=tal(al.filter(p=>R[p.id]==="maf").map(p=>p[F]).filter(Boolean)),sv=(al.find(p=>R[p.id]==="doc")||{})[F],k=kv&&kv!==sv?kv:null;
+  let dd=[...room.dead],R2={...R},msg="☀️ Morning. Nobody died last night.";
+  if(k){dd.push(k);msg="☀️ Morning. "+nm(k)+" was killed in the night.";if(room.po&&room.tgt===k&&R2[room.po]==="plo"){R2[room.po]="vil";ann(g,room.po,"Your target died. You are now a plain villager.")}}
+  ann(g,"all",msg,k?{fx:"kill",vic:k}:{});rdoc().update({sx:sx("morning")});
+  setTimeout(()=>rdoc().update({sx:sx(k?"kill":"vote")}),k?1500:1200);
+  const w=winner(dd,R2);
+  setTimeout(()=>{if(w)return fin({dead:dd,roles:R2},w);rdoc().update({phase:"mtalk",dead:dd,roles:R2,docLast:sv||null,dl:Date.now()+75000});ann(g,"all","💬 Discuss! You have 75 seconds.")},k?6000:3000);
+ },wait)}
+function toVote(ph){rdoc().update({phase:ph,dl:Date.now()+30000});ann(room.gid,"all",ph==="mvote"?"🗳️ Voting begins: 30 seconds.":"🗳️ Tie-break vote: 30 seconds. Pleas are shown beside each name.")}
 function resolveVote(two){
  const g=room.gid,f=(two?"w":"v")+g+"_"+room.d;let vs=A().filter(p=>!dead(p.id)).map(p=>p[f]).filter(Boolean);if(two)vs=vs.filter(v=>room.tied.includes(v));
  const c={};vs.forEach(v=>c[v]=(c[v]||0)+1);const m=Math.max(0,...Object.values(c)),top=Object.keys(c).filter(k=>c[k]===m);
- if(!top.length){ann(g,"all","⚖️ Nobody voted. No one is eliminated.");return toNight([...room.dead],room.roles)}
+ if(!top.length){ann(g,"all","⚖️ Nobody voted. No one is eliminated.");return void setTimeout(()=>toNight([...room.dead],room.roles),3000)}
  if(top.length>1&&!two){rdoc().update({phase:"mplead2",tied:top,dl:Date.now()+15000});return ann(g,"all","🤝 Tie between "+top.map(nm).join(" and ")+". Tied players, plead your case again (15s).")}
  if(top.length>1)ann(g,"all","🎲 Tied again. Fate chooses.");
  const id=pick(top),R=room.roles,dd=[...room.dead,id],rv=!room.ru&&A().some(p=>R[p.id]==="rev"&&!dead(p.id)&&p["rv"+g]===room.d);
- ann(g,"all","⚖️ "+nm(id)+" was voted out."+(rv?" Revealed role: "+RN[R[id]]+".":""));
+ ann(g,"all","⚖️ "+nm(id)+" was voted out."+(rv?" Revealed role: "+RN[R[id]]+".":""),{fx:"vote",vic:id});rdoc().update({sx:sx("vote")});
  const u={dead:dd,ru:room.ru||rv};
- if(room.po&&R[room.po]==="plo"&&room.tgt===id&&!dd.includes(room.po))return fin(u,"🃏 "+nm(room.po)+" the Plotter wins alone!");
- const w=winner(dd,R);w?fin(u,w):toNight(dd,R,u);
+ setTimeout(()=>{if(room.po&&R[room.po]==="plo"&&room.tgt===id&&!dd.includes(room.po))return fin(u,"🃏 "+nm(room.po)+" the Plotter wins alone!");const w=winner(dd,R);w?fin(u,w):toNight(dd,R,u)},5000);
 }
 function mtick(){
  if(!isHost()||!room||room.game!=="maf"||!room.roles)return;
  const ph=room.phase,g=room.gid,d=room.d,over=Date.now()>room.dl,al=A().filter(p=>!dead(p.id)),all=(s,a=al)=>a.length>0&&a.every(p=>p[s+g+"_"+d]!==undefined),key=ph+g+d+room.qi,go=fn=>{if(mkey===key)return;mkey=key;fn()};
  if(ph==="mnight"){const r=room.q[room.qi];if(over||all("n",al.filter(p=>room.roles[p.id]===r)))go(()=>nightStep(r))}
- else if(ph==="mtalk"){if(over)go(()=>{rdoc().update({phase:"mplead",dl:Date.now()+15000});ann(g,"all","✍️ Plead your case! 15 seconds, everyone writes at once.")})}
- else if(ph==="mplead"){if(over||all("pl"))go(()=>toVote("mvote"))}
+ else if(ph==="mtalk"){if(over)go(()=>toVote("mvote"))}
  else if(ph==="mplead2"){if(over||all("pt",al.filter(p=>room.tied.includes(p.id))))go(()=>toVote("mvote2"))}
  else if(ph==="mvote"){if(over||all("v"))go(()=>resolveVote(false))}
  else if(ph==="mvote2"){if(over||all("w"))go(()=>resolveVote(true))}
 }
-setInterval(()=>{updTm();mtick()},1000);
+const fresh=p=>Date.now()-(p.ls||p.t||0)<40000;
+function setP(){const n=PRAW.filter(fresh).sort((a,b)=>a.t-b.t),g=JSON.stringify(n.map(p=>{const{ls,...r}=p;return r}));P=n;if(g!==psig){psig=g;return true}return false}
+function beat(){if(!code||!room)return;pdoc().update({ls:Date.now()}).catch(()=>{});if(isHost())rdoc().update({hb:Date.now(),pc:P.length}).catch(()=>{})}
+function presTick(){if(!user||scr)return;if(!code||!room){render();return}
+ if(setP()){host();render()}
+ if(P.length&&!P.some(p=>p.id===room.host)&&P[0].id===me){const u={host:me};if(room.game==="maf"&&room.narr)u.narr=false;rdoc().update(u).catch(()=>{})}}
+async function leave(){const nx=P.find(p=>p.id!==me);
+ try{if(isHost()&&nx){const u={host:nx.id};if(room.game==="maf"&&room.narr)u.narr=false;await rdoc().update(u)}await pdoc().delete()}catch(e){}
+ unsub.forEach(u=>u());unsub=[];code="";room=null;P=[];PRAW=[];CH=[];psig=rsig="";render()}
+const mkRoom=()=>enter(Math.random().toString(36).slice(2,8).toUpperCase(),true);
+const rGame=r=>r.phase==="lobby"?"In lobby":r.game==="maf"?"🎭 Mafia":"🕵️ "+(GAMES[r.game]||"Imposter");
+const isSpec=()=>room.phase!=="lobby"&&room.ids&&!room.ids.includes(me);
+const specView=()=>(room.game==="maf"?stage():"")+`<div class="card"><h2>👀 You're spectating</h2><p class="mu">You joined while a round was running. You can chat, and you'll play in the next round when the host clicks Play again.</p></div>`;
+fb.collection("rooms").onSnapshot(q=>{RL=q.docs.map(d=>({id:d.id,...d.data()}));if(!code&&user&&!scr)render()},()=>{});
+const SN={kill:"kill",vote:"voteout",morning:"morning",mafia:"mafia",doc:"doctor",det:"detective",load:"revealer_load",use:"revealer_use",noammo:"revealer_not_use"},AU={},TH=["mafia","doc","det"];
+for(const k in SN){const a=new Audio("sounds/"+SN[k]+".mp3");a.preload="auto";AU[k]=a}
+function snd(k){const a=AU[k];if(!a)return;if(TH.includes(k)||k==="morning"||k==="kill"||k==="vote")TH.forEach(t=>{if(t!==k){AU[t].pause();AU[t].currentTime=0}});try{a.currentTime=0;a.play().catch(()=>{})}catch(e){}}
+document.addEventListener("pointerdown",()=>{for(const k in AU){const a=AU[k];a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false}).catch(()=>{a.muted=false})}},{once:true});
+function sxCheck(){const x=room&&room.sx;if(lastSx===null){lastSx=x?x.id:"";return}if(x&&x.id!==lastSx){lastSx=x.id;snd(x.k)}}
+function fxHtml(l){if(!l||!l.fx||!l.vic)return"";const st=fxS[l.id]||(fxS[l.id]=Date.now()),el=(Date.now()-st)/1000;if(el>5.2)return"";
+ const p=P.find(x=>x.id===l.vic),pf=p&&p.pfp,d=`animation-delay:-${el.toFixed(2)}s`;
+ if(l.fx==="vote")return`<div class="fa fl" style="${d}">${av(pf,64)}</div>`;
+ return`<div class="fa"><span class="hf a" style="${d}">${av(pf,64)}</span><span class="hf b" style="${d}">${av(pf,64)}</span><i class="sl" style="${d}"></i></div>`}
+const skipPh=()=>{const l=room.dl-Date.now();rdoc().update({dl:room.phase==="mtalk"&&l>10000?Date.now()+10000:1})};
+function revBox(){if(room.roles[me]!=="rev"||room.ru||dead(me))return"";const k=room.gid+"_"+room.d,l=room.dl-Date.now(),mp=P.find(p=>p.id===me)||{};
+ if(mp["rv"+room.gid]===room.d)return`<p>📢 Reveal armed. It fires when this round's vote ends.</p>`;
+ if(revA===k)return`<p class="mu">You held your fire this round.</p>`;
+ return l<=10500?`<div class="prompt">📢 Reveal the role of whoever gets voted out?<br><button onclick="revAns(1)">Yes</button><button class="alt" onclick="revAns(0)">No</button></div>`:""}
+function revAns(y){const k=room.gid+"_"+room.d;revA=k;if(y){say("rv"+room.gid,room.d);snd("use")}else snd("noammo");render()}
+function revTick(){if(!room||room.game!=="maf"||!room.roles||room.roles[me]!=="rev"||room.ru||dead(me))return;
+ const k=room.gid+"_"+room.d,l=room.dl-Date.now();
+ if(room.phase==="mtalk"){if(l<=10000&&revK!==k){revK=k;snd("load");render()}}
+ else if(revK===k&&revA!==k){revA=k;snd("noammo");render()}}
+setInterval(()=>{updTm();mtick();revTick()},1000);setInterval(beat,15000);setInterval(presTick,10000);
 function updTm(){const e=$("#tm");if(e&&room&&room.dl)e.textContent=Math.max(0,Math.ceil((room.dl-Date.now())/1000))+"s"}
 function mafView(){
  const ph=room.phase,d=room.d,g=room.gid,R=room.roles,mr=R[me],nr=narr(),dm=dead(me),al=A().filter(p=>!dead(p.id)),mp=P.find(p=>p.id===me)||{},sfx=g+"_"+d;
@@ -324,21 +370,20 @@ function mafView(){
  else h+=`<div class="card"><h2>${dm?"💀 You're dead":"Your role: "+RN[mr]}</h2><p class="mu">${RD[mr]||""}</p>${mr==="maf"?`<p>Team: ${A().filter(p=>R[p.id]==="maf").map(p=>esc(p.name)).join(", ")}</p>`:""}${mr==="plo"?`<p>Your target: <b>${esc(nm(room.tgt))}</b></p>`:""}${dm||ph==="mend"?`<p class="mu">${all}</p>`:""}</div>`;
  if(ph==="mend")return h+`<div class="card"><h2>🏁 ${esc(room.winner)}</h2><p class="mu">${all}</p>${isHost()?`<button onclick="rdoc().update({phase:'lobby'})">Play again</button>`:""}</div>`;
  const T={mnight:"🌙 Night",mtalk:"☀️ Day: discuss",mplead:"Plead your case:",mplead2:"Tie: plead again",mvote:"🗳️ Vote someone out",mvote2:"🗳️ Tie-break vote"}[ph];
- h+=`<div class="card"><h2>${T}</h2><div class="mu">⏱ <span id="tm"></span> ${isHost()?`<button class="alt" onclick="rdoc().update({dl:1})">⏭ Skip</button>`:""}</div><div class="chips">${A().map(p=>`<span class="${dead(p.id)?"":"done"}">${dead(p.id)?"💀 ":""}${esc(p.name)}</span>`).join("")}</div>`;
+ h+=`<div class="card"><h2>${T}</h2><div class="mu">⏱ <span id="tm"></span> ${isHost()?`<button class="alt" onclick="skipPh()">⏭ Skip</button>`:""}</div><div class="chips">${A().map(p=>`<span class="${dead(p.id)?"":"done"}">${dead(p.id)?"💀 ":""}${esc(p.name)}</span>`).join("")}</div>`;
  const ok=!dm&&!nr;
  if(ph==="mnight"){const r=room.q[room.qi];
   if(nr)h+=`<p class="mu">Waiting for ${RN[r]}…</p>`;
   else if(ok&&mr===r){const F="n"+sfx;h+=mp[F]!==undefined?`<p class="mu">Choice locked in.</p>`:`<p>${PR[r]}</p>`+al.filter(p=>r==="maf"?R[p.id]!=="maf":r==="det"?p.id!==me:p.id!==room.docLast).map(p=>`<button class="alt" onclick="say('${F}','${p.id}')">${esc(p.name)}</button>`).join("")}
   else h+=`<p class="mu">Close your eyes…</p>`}
- else if(ph==="mtalk")h+=`<p class="mu">Discuss in the chat below.</p>`;
+ else if(ph==="mtalk")h+=`<p class="mu">Discuss in the chat below.</p>`+revBox();
  else if(ph==="mplead"||ph==="mplead2"){const F=(ph==="mplead"?"pl":"pt")+sfx;
   if(ok&&(ph==="mplead"||room.tied.includes(me)))h+=mp[F]!==undefined?`<p class="mu">Plea locked in.</p>`:`<input id="pl" placeholder="Why you're innocent…" maxlength="140" style="width:100%"><button onclick="say('${F}',$('#pl').value.trim()||'(no comment)')">Submit</button>`;
   else h+=`<p class="mu">${ph==="mplead2"?"Waiting for the tied players…":"Waiting for pleas…"}</p>`}
  else{const two=ph==="mvote2",V=(two?"w":"v")+sfx,rows=(two?room.tied:al.map(p=>p.id));
-  h+=`<table>${rows.map(id=>{const p=P.find(x=>x.id===id)||{};return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p[(two?"pt":"pl")+sfx]||"—")}</td><td>${ok&&mp[V]===undefined&&id!==me?`<button class="alt" onclick="say('${V}','${id}')">Vote</button>`:""}</td></tr>`}).join("")}</table>`;
+  h+=`<table>${rows.map(id=>{const p=P.find(x=>x.id===id)||{};return `<tr><td><b>${esc(p.name)}</b></td><td>${two?esc(p["pt"+sfx]||"—"):""}</td><td>${ok&&mp[V]===undefined&&id!==me?`<button class="alt" onclick="say('${V}','${id}')">Vote</button>`:""}</td></tr>`}).join("")}</table>`;
   if(ok&&mp[V]!==undefined)h+=`<p class="mu">Vote cast. Waiting…</p>`;
-  if(ok&&mr==="rev"&&!room.ru)h+=mp["rv"+g]===d?`<p>📢 Reveal armed.</p>`:`<button onclick="say('rv${g}',${d})">📢 Arm reveal (once)</button>`;
   h+=`<div class="chips">${al.map(p=>`<span class="${p[V]!==undefined?"done":""}">${esc(p.name)}</span>`).join("")}</div>`}
  return h+"</div>"}
-Object.assign(window,{doLogin,goScr,checkSite,openProf,cancelProf,logout,sfset,setG,setPf,onCustom,saveProf,setTab,unlock,draftM,openMaf,closeMaf,startMaf,sendChat,enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
+Object.assign(window,{mkRoom,leave,skipPh,revAns,doLogin,goScr,checkSite,openProf,cancelProf,logout,sfset,setG,setPf,onCustom,saveProf,setTab,unlock,draftM,openMaf,closeMaf,startMaf,sendChat,enter,start,say,next,rdoc,$,draft,openSetup,closeSetup,startOwn,render});
 </script></body></html>
