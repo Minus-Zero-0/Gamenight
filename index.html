@@ -43,9 +43,10 @@ table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;bord
 .sc{display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;gap:6px;width:clamp(58px,17vw,96px);flex:none}
 .sc:empty{display:none}
 .sm .scr{flex:1;min-width:0}
-.pc{width:clamp(58px,17vw,96px)}
+.pc{width:clamp(60px,17vw,96px);padding:6px 3px;border-radius:14px;border:1.5px solid #8a6cff;background:radial-gradient(circle at 50% 30%,#3a1f5c,#120a1f 70%);color:#fff;box-shadow:0 0 14px #7c5cff66,inset 0 0 14px #000a}
+.pc.me{border-color:var(--ok);box-shadow:0 0 20px var(--ok),inset 0 0 14px #000a}
 .pc .av{width:clamp(34px,9vw,56px)!important;height:clamp(34px,9vw,56px)!important}
-.pc button{margin:2px 0 0;padding:3px 9px;font-size:.7rem;border-radius:8px}
+.pc button{margin:2px 0 0;padding:3px 6px;font-size:.7rem;border-radius:8px}
 .lg2{position:absolute;top:8px;left:12px;font-size:.7rem;letter-spacing:.25em;opacity:.55}
 .pc{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.72rem;text-align:center;min-width:0}
 .pc small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc.dd{opacity:.4;filter:grayscale(1)}
@@ -158,7 +159,7 @@ function act(p){const R=room.roles||{},mr=R[me];if(!mr||dead(me)||dead(p.id))ret
   return `<button onclick="say('${V}','${p.id}')">Vote</button>`}
  return""}
 function stage(){const ps=A(),n=ps.length,s=Math.floor(n/4),rem=n-2*s,nt=Math.ceil(rem/2),
- c=p=>`<div class="pc ${dead(p.id)?"dd":""}">${av(p.pfp,46)}<small>${esc(p.name)}</small>${act(p)}</div>`,
+ c=p=>`<div class="pc ${dead(p.id)?"dd":""} ${p.id===me?"me":""}">${av(p.pfp,46)}<small>${esc(p.name)}</small>${act(p)}</div>`,
  lat=CH.filter(x=>x.gid===room.gid&&x.ann&&vis(x)).pop(),fx=lat&&lat.id!==shown?"fx":"";shown=lat?lat.id:"";
  const top=ps.slice(0,nt).map(c).join(""),left=ps.slice(nt,nt+s).map(c).join(""),right=ps.slice(nt+s,nt+2*s).map(c).join(""),bot=ps.slice(nt+2*s).map(c).join("");
  let mid;
